@@ -1,0 +1,49 @@
+# Build
+/build/
+/out/
+/dist/
+/cmake-build-*/
+/target/
+**/*.rs.bk
+
+# Local SFX generation cache (copies of assets/audio)
+/sfx_cache/
+
+# Microsoft Consolas placeholder. Not redistributable.
+# Put a libre TTF here before building UI text (see assets/fonts/README.txt).
+/assets/fonts/ui.ttf
+
+# Android local SDK path
+/android/local.properties
+/android/.gradle/
+/android/app/build/
+/android/build/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Tooling
+*.pdb
+*.ilk
+*.exp
+*.lib
+!crates/**/*.lib
+
+# Local SDK overlays
+/third_party/vulkan-sdk/
+
+# Benchmarks / logs
+*.log
+/benchmarks/results/
+
+# proptest failure corpus
+**/proptest-regressions/

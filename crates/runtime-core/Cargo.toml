@@ -1,0 +1,18 @@
+[package]
+name = "runtime-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Shared Vertical Shift runtime types and version constants"
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+proptest = "1.5"
+
+[[bench]]
+name = "sim_bench"
+path = "benches/sim_bench.rs"
+harness = false
