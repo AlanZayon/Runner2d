@@ -1,0 +1,14 @@
+# Target labels
+ vulkanheaders-populate
+# Source files and their labels
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate-complete.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-build.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-configure.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-download.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-install.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-mkdir.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-patch.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-test.rule
+C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-update.rule

@@ -1,0 +1,73 @@
+{
+  "buildFiles": [
+    "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\_deps\\volk-src\\CMakeLists.txt",
+    "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\_deps\\vulkanheaders-src\\CMakeLists.txt",
+    "C:\\Users\\alanz\\source\\repos\\Runner2d\\CMakeLists.txt",
+    "C:\\Users\\alanz\\source\\repos\\Runner2d\\native\\CMakeLists.android.inc.cmake",
+    "C:\\Users\\alanz\\source\\repos\\Runner2d\\native\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\alanz\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\alanz\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "vs_audio::@39f8f1661852dc709093": {
+      "artifactName": "vs_audio",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\native\\libvs_audio.a",
+      "runtimeFiles": []
+    },
+    "vs_math::@39f8f1661852dc709093": {
+      "artifactName": "vs_math",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\native\\libvs_math.a",
+      "runtimeFiles": []
+    },
+    "android_native_app_glue::@39f8f1661852dc709093": {
+      "artifactName": "android_native_app_glue",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\native\\libandroid_native_app_glue.a",
+      "runtimeFiles": []
+    },
+    "vs_ui::@39f8f1661852dc709093": {
+      "artifactName": "vs_ui",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\native\\libvs_ui.a",
+      "runtimeFiles": []
+    },
+    "vs_platform::@39f8f1661852dc709093": {
+      "artifactName": "vs_platform",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\native\\libvs_platform.a",
+      "runtimeFiles": []
+    },
+    "vertical_shift::@39f8f1661852dc709093": {
+      "artifactName": "vertical_shift",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\build\\intermediates\\cxx\\Debug\\3p1l1g6w\\obj\\arm64-v8a\\libvertical_shift.so",
+      "runtimeFiles": []
+    },
+    "volk::@2f990ff50bbcc7f22b46": {
+      "artifactName": "volk",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\_deps\\volk-build\\libvolk.a",
+      "runtimeFiles": []
+    },
+    "vs_renderer::@39f8f1661852dc709093": {
+      "artifactName": "vs_renderer",
+      "abi": "arm64-v8a",
+      "output": "C:\\Users\\alanz\\source\\repos\\Runner2d\\android\\app\\.cxx\\Debug\\3p1l1g6w\\arm64-v8a\\native\\libvs_renderer.a",
+      "runtimeFiles": []
+    }
+  }
+}

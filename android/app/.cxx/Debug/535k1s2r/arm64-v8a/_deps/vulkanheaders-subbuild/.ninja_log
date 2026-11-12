@@ -1,0 +1,21 @@
+# ninja log v5
+1	93	8162160969845420	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-mkdir	b595c8c362056b94
+1	93	8162160969845420	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-mkdir	b595c8c362056b94
+93	25779	8162161226706593	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-download	8cc61f6732d0bb1e
+93	25779	8162161226706593	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-download	8cc61f6732d0bb1e
+25780	25928	0	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-update	109aee876e147e77
+25780	25928	0	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-update	109aee876e147e77
+25928	25996	8162161228880534	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-patch	2101c83e258fb9c0
+25928	25996	8162161228880534	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-patch	2101c83e258fb9c0
+25996	26060	8162161229517643	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-configure	64194624c7333fd6
+25996	26060	8162161229517643	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-configure	64194624c7333fd6
+26060	26126	8162161230157669	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-build	ad7eeba478ecd0c8
+26060	26126	8162161230157669	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-build	ad7eeba478ecd0c8
+26126	26192	8162161230816804	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-install	e6447073af0e3551
+26126	26192	8162161230816804	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-install	e6447073af0e3551
+26192	26254	8162161231462335	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-test	cdfc939e8b81b939
+26192	26254	8162161231462335	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-test	cdfc939e8b81b939
+26255	26348	8162161232400380	CMakeFiles/vulkanheaders-populate-complete	56b23dde826a9848
+26255	26348	8162161232400380	vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-done	56b23dde826a9848
+26255	26348	8162161232400380	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate-complete	56b23dde826a9848
+26255	26348	8162161232400380	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-done	56b23dde826a9848

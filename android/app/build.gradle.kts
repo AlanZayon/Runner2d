@@ -2,6 +2,9 @@ plugins {
     id("com.android.application")
 }
 
+val vsVersionCode = 16
+val vsVersionName = "0.16.0"
+
 android {
     namespace = "com.verticalshift.game"
     compileSdk = 34
@@ -10,8 +13,8 @@ android {
         applicationId = "com.verticalshift.game"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.12.0-phase12"
+        versionCode = vsVersionCode
+        versionName = vsVersionName
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -20,6 +23,7 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DVS_BUILD_TESTS=OFF",
+                    "-DVS_APP_VERSION=$vsVersionName",
                 )
             }
         }

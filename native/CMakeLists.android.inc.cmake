@@ -114,9 +114,13 @@ target_include_directories(vertical_shift PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ffi
     ${VS_ANDROID_GLUE_DIR}
 )
+if(NOT DEFINED VS_APP_VERSION)
+    set(VS_APP_VERSION "dev")
+endif()
 target_compile_definitions(vertical_shift PRIVATE
     "VS_SHADER_DIR=\"shaders\""
     "VS_ASSET_DIR=\"\""
+    "VS_APP_VERSION=\"${VS_APP_VERSION}\""
 )
 target_link_libraries(vertical_shift PRIVATE
     vs_platform

@@ -1,0 +1,41 @@
+{
+	"abstract" : true,
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library"
+		],
+		"files" : 
+		[
+			"android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 41,
+				"parent" : 0
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"id" : "Vulkan-Headers::@56f5ac06489e4718b17b",
+	"name" : "Vulkan-Headers",
+	"paths" : 
+	{
+		"build" : "_deps/vulkanheaders-build",
+		"source" : "android/app/.cxx/Debug/5343w435/arm64-v8a/_deps/vulkanheaders-src"
+	},
+	"sources" : [],
+	"type" : "INTERFACE_LIBRARY"
+}

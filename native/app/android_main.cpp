@@ -44,9 +44,9 @@ extern "C" void android_main(struct android_app* state) {
         cfg.save_override_dir = state->activity->internalDataPath;
     }
 
-    vs_log("VERTICAL SHIFT Phase 9 Android host starting");
+    vs_log("VERTICAL SHIFT Android host starting v=%s", VS_APP_VERSION);
     const int rc = vs_run_host(platform, *renderer, cfg);
-    vs_log("Android host exit=%d", rc);
+    vs_log("Android host exit=%d v=%s", rc, VS_APP_VERSION);
 
     renderer->shutdown();
     delete renderer;

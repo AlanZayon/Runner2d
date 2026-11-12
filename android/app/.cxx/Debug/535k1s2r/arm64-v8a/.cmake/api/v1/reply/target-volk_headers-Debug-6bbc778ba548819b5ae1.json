@@ -1,0 +1,55 @@
+{
+	"abstract" : true,
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"target_link_libraries"
+		],
+		"files" : 
+		[
+			"android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-src/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 51,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 58,
+				"parent" : 0
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"id" : "volk_headers::@2f990ff50bbcc7f22b46",
+	"interfaceLinkLibraries" : 
+	[
+		{
+			"backtrace" : 2,
+			"fragment" : "dl"
+		}
+	],
+	"name" : "volk_headers",
+	"paths" : 
+	{
+		"build" : "_deps/volk-build",
+		"source" : "android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-src"
+	},
+	"sources" : [],
+	"type" : "INTERFACE_LIBRARY"
+}

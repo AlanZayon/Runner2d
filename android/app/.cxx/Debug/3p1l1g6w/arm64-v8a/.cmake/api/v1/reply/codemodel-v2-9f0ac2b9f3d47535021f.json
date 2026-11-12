@@ -1,0 +1,250 @@
+{
+	"configurations" : 
+	[
+		{
+			"abstractTargets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "Git::Git::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Git__Git-Debug-63168e33cd14f6a75809.json",
+					"name" : "Git::Git",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "Vulkan-Headers::@56f5ac06489e4718b17b",
+					"jsonFile" : "target-Vulkan-Headers-Debug-c34ebd2ff485ea4a400e.json",
+					"name" : "Vulkan-Headers",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "runtime_bridge_imported::@39f8f1661852dc709093",
+					"jsonFile" : "target-runtime_bridge_imported-Debug-761f61014e390c53b8fc.json",
+					"name" : "runtime_bridge_imported",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "volk_headers::@2f990ff50bbcc7f22b46",
+					"jsonFile" : "target-volk_headers-Debug-486c35152066f422f3ff.json",
+					"name" : "volk_headers",
+					"projectIndex" : 2
+				}
+			],
+			"directories" : 
+			[
+				{
+					"abstractTargetIndexes" : 
+					[
+						0
+					],
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3
+					],
+					"jsonFile" : "directory-.-Debug-b5805d5c08fd3d92def4.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"projectIndex" : 0,
+					"source" : "."
+				},
+				{
+					"abstractTargetIndexes" : 
+					[
+						1
+					],
+					"build" : "_deps/vulkanheaders-build",
+					"jsonFile" : "directory-_deps.vulkanheaders-build-Debug-489c5d7f0334af4b25b7.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "android/app/.cxx/Debug/3p1l1g6w/arm64-v8a/_deps/vulkanheaders-src"
+				},
+				{
+					"abstractTargetIndexes" : 
+					[
+						3
+					],
+					"build" : "_deps/volk-build",
+					"jsonFile" : "directory-_deps.volk-build-Debug-ca43007306e0263f492f.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 2,
+					"source" : "android/app/.cxx/Debug/3p1l1g6w/arm64-v8a/_deps/volk-src",
+					"targetIndexes" : 
+					[
+						2
+					]
+				},
+				{
+					"abstractTargetIndexes" : 
+					[
+						2
+					],
+					"build" : "native",
+					"jsonFile" : "directory-native-Debug-fa5a2f91beb50ca3eeef.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.6.0"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "native",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						3,
+						4,
+						5,
+						6,
+						7
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"abstractTargetIndexes" : 
+					[
+						0,
+						2
+					],
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"directoryIndexes" : 
+					[
+						0,
+						3
+					],
+					"name" : "vertical_shift",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						3,
+						4,
+						5,
+						6,
+						7
+					]
+				},
+				{
+					"abstractTargetIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "VULKAN_HEADERS",
+					"parentIndex" : 0
+				},
+				{
+					"abstractTargetIndexes" : 
+					[
+						3
+					],
+					"directoryIndexes" : 
+					[
+						2
+					],
+					"name" : "volk",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 3,
+					"id" : "android_native_app_glue::@39f8f1661852dc709093",
+					"jsonFile" : "target-android_native_app_glue-Debug-ab4478a43e8b97f6e5bb.json",
+					"name" : "android_native_app_glue",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "vertical_shift::@39f8f1661852dc709093",
+					"jsonFile" : "target-vertical_shift-Debug-4c4e07b9c4a8552128b1.json",
+					"name" : "vertical_shift",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "volk::@2f990ff50bbcc7f22b46",
+					"jsonFile" : "target-volk-Debug-98e488eaf90868537669.json",
+					"name" : "volk",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "vs_audio::@39f8f1661852dc709093",
+					"jsonFile" : "target-vs_audio-Debug-35182e834b5f10409875.json",
+					"name" : "vs_audio",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "vs_math::@39f8f1661852dc709093",
+					"jsonFile" : "target-vs_math-Debug-9e1ec806d78b0ebb834c.json",
+					"name" : "vs_math",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "vs_platform::@39f8f1661852dc709093",
+					"jsonFile" : "target-vs_platform-Debug-6cf8acfbab48dce64873.json",
+					"name" : "vs_platform",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "vs_renderer::@39f8f1661852dc709093",
+					"jsonFile" : "target-vs_renderer-Debug-bbad641cc35199ae7c3b.json",
+					"name" : "vs_renderer",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "vs_ui::@39f8f1661852dc709093",
+					"jsonFile" : "target-vs_ui-Debug-f7a7edabd0a7d3bd532a.json",
+					"name" : "vs_ui",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/3p1l1g6w/arm64-v8a",
+		"source" : "C:/Users/alanz/source/repos/Runner2d"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	}
+}

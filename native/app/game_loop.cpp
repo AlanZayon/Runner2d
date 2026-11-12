@@ -128,6 +128,16 @@ int run_game_loop(
     float shake_mag = 0.0f;
 
     AppScreen screen = config.benchmark_seconds > 0.0 ? AppScreen::Playing : AppScreen::Title;
+    // Resume-from-pause: 3 → 2 → 1 → 0 (1s each) with the world still visible.
+    float countdown_left = 0.0f;
+    int countdown_display = 0;
+    auto begin_resume_countdown = [&]() {
+        screen = AppScreen::Countdown;
+        countdown_left = 4.0f; // 3,2,1,0 — one second each
+        countdown_display = 3;
+        prev = platform.monotonic_seconds();
+        accumulator = 0.0;
+    };
     SaveStore save;
     save.load();
     GestureRecognizer gestures;
@@ -186,6 +196,8 @@ int run_game_loop(
         vs_world_reset();
         scene.set_viewport(static_cast<float>(platform.width()), static_cast<float>(platform.height()));
         shake_mag = 0.0f;
+        countdown_left = 0.0f;
+        countdown_display = 0;
         screen = AppScreen::Playing;
     };
 
@@ -198,13 +210,17 @@ int run_game_loop(
                 break;
             case PlatformEvent::Kind::FocusLost:
             case PlatformEvent::Kind::Pause:
-                // System background: freeze sim only. Don't enter the Pause menu — returning
-                // should continue the run. (Back/Esc still opens Paused intentionally.)
                 focus_paused = true;
-                if (!platform.native_window_handle()) {
-                    renderer.lose_window_surface();
+                // Leaving the app mid-run (or mid-countdown) → Pause menu so return isn't live.
+                if (screen == AppScreen::Playing || screen == AppScreen::Countdown) {
+                    screen = AppScreen::Paused;
+                    countdown_left = 0.0f;
+                    countdown_display = 0;
                 }
-                vs_log("Paused (focus/background)");
+                // Always drop the Vulkan surface: the ANativeWindow may be invalidated even
+                // when the pointer is still non-null (common on ColorOS / Home).
+                renderer.lose_window_surface();
+                vs_log("Paused (focus/background) v=%s", VS_APP_VERSION);
                 break;
             case PlatformEvent::Kind::FocusGained:
             case PlatformEvent::Kind::Resume:
@@ -215,19 +231,18 @@ int run_game_loop(
                     const int w = platform.width();
                     const int h = platform.height();
                     if (w > 0 && h > 0) {
-                        if (!renderer.has_surface()) {
-                            if (!renderer.recreate_window_surface(
-                                    platform.native_window_handle(), w, h)) {
-                                vs_log("Resume: surface recreate deferred");
-                            }
+                        // Always full recreate after background — resize on a dead surface fails silently.
+                        if (!renderer.recreate_window_surface(
+                                platform.native_window_handle(), w, h)) {
+                            vs_log("Resume: surface recreate deferred w=%d h=%d", w, h);
                         } else {
-                            renderer.resize(w, h);
+                            vs_log("Resume: surface ok %dx%d", w, h);
                         }
                         scene.set_viewport(static_cast<float>(w), static_cast<float>(h));
                         apply_gesture_thresholds(w, h);
                     }
                 }
-                vs_log("Resumed");
+                vs_log("Resumed v=%s screen=%d", VS_APP_VERSION, static_cast<int>(screen));
                 break;
             case PlatformEvent::Kind::Resize:
                 if (event.width > 0 && event.height > 0) {
@@ -243,12 +258,14 @@ int run_game_loop(
                 break;
             case PlatformEvent::Kind::Back:
                 gestures.on_event(event, platform.monotonic_seconds());
-                if (screen == AppScreen::Playing) {
+                if (screen == AppScreen::Playing || screen == AppScreen::Countdown) {
                     screen = AppScreen::Paused;
+                    countdown_left = 0.0f;
+                    countdown_display = 0;
                 } else if (screen == AppScreen::Paused) {
-                    screen = AppScreen::Playing;
-                    prev = platform.monotonic_seconds();
-                    accumulator = 0.0;
+                    screen = AppScreen::Title;
+                    countdown_left = 0.0f;
+                    countdown_display = 0;
                 } else if (screen == AppScreen::Title) {
                     running = false;
                 }
@@ -263,12 +280,12 @@ int run_game_loop(
                 const int vk = event.key;
                 // Screen / volume keys handled here; gameplay keys go to InputState.
                 if (vk == VK_ESCAPE) {
-                    if (screen == AppScreen::Playing) {
+                    if (screen == AppScreen::Playing || screen == AppScreen::Countdown) {
                         screen = AppScreen::Paused;
+                        countdown_left = 0.0f;
+                        countdown_display = 0;
                     } else if (screen == AppScreen::Paused) {
-                        screen = AppScreen::Playing;
-                        prev = platform.monotonic_seconds();
-                        accumulator = 0.0;
+                        begin_resume_countdown();
                     } else if (screen == AppScreen::Title) {
                         running = false;
                     }
@@ -351,9 +368,7 @@ int run_game_loop(
             if (screen == AppScreen::Title || screen == AppScreen::GameOver) {
                 restart_run();
             } else if (screen == AppScreen::Paused) {
-                screen = AppScreen::Playing;
-                prev = platform.monotonic_seconds();
-                accumulator = 0.0;
+                begin_resume_countdown();
             }
         }
         gestures.clear_ui_edges();
@@ -366,6 +381,26 @@ int run_game_loop(
         }
         if (frame_dt > 0.25) {
             frame_dt = 0.25;
+        }
+
+        if (screen == AppScreen::Countdown && !focus_paused) {
+            countdown_left -= static_cast<float>(frame_dt);
+            // 4s window → 3, 2, 1, 0, then go.
+            if (countdown_left > 3.0f) {
+                countdown_display = 3;
+            } else if (countdown_left > 2.0f) {
+                countdown_display = 2;
+            } else if (countdown_left > 1.0f) {
+                countdown_display = 1;
+            } else if (countdown_left > 0.0f) {
+                countdown_display = 0;
+            } else {
+                screen = AppScreen::Playing;
+                countdown_left = 0.0f;
+                countdown_display = 0;
+                accumulator = 0.0;
+                vs_log("Countdown done — Playing");
+            }
         }
 
         const bool sim_active = (screen == AppScreen::Playing) && !focus_paused;
@@ -475,7 +510,7 @@ int run_game_loop(
             const auto t_ex0 = std::chrono::steady_clock::now();
 
             if (screen == AppScreen::Playing || screen == AppScreen::Paused ||
-                screen == AppScreen::GameOver) {
+                screen == AppScreen::Countdown || screen == AppScreen::GameOver) {
                 scene.extract(world_sprites, camera);
                 // Visual-only shake
                 if (shake_mag > 0.1f) {
@@ -493,7 +528,7 @@ int run_game_loop(
 
             const auto t_dr0 = std::chrono::steady_clock::now();
             if (screen == AppScreen::Playing || screen == AppScreen::Paused ||
-                screen == AppScreen::GameOver) {
+                screen == AppScreen::Countdown || screen == AppScreen::GameOver) {
                 if (debug_overlay) {
                     VsDebugAabb aabbs[128];
                     uint32_t aabb_n = 0;
@@ -511,7 +546,8 @@ int run_game_loop(
             if (font_ok && white.valid()) {
                 UiDraw ui;
                 ui.begin(ui_sprites, &font, white);
-                if (screen == AppScreen::Playing || screen == AppScreen::Paused) {
+                if (screen == AppScreen::Playing || screen == AppScreen::Paused ||
+                    screen == AppScreen::Countdown) {
                     hud_draw(ui, vw, vh, run);
                 }
                 ScreenDrawParams sp{};
@@ -527,6 +563,8 @@ int run_game_loop(
 #else
                 sp.touch_ui = false;
 #endif
+                sp.version = VS_APP_VERSION;
+                sp.countdown_value = countdown_display;
                 screens_draw(ui, screen, sp);
                 if (debug_overlay) {
                     DebugOverlayStats dos{};
@@ -556,9 +594,10 @@ int run_game_loop(
             }
 
             if (!renderer.end_frame()) {
-                vs_log("Present failed");
-                running = false;
-                break;
+                // OUT_OF_DATE / background present failure must NOT kill the host loop —
+                // that caused the eternal black screen after Home → return.
+                vs_log("Present failed — dropping surface, will recreate (v=%s)", VS_APP_VERSION);
+                renderer.lose_window_surface();
             }
             stats.sum_draw_ms += std::chrono::duration<double, std::milli>(
                                      std::chrono::steady_clock::now() - t_dr0)

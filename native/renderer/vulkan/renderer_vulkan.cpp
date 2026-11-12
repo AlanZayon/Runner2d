@@ -998,10 +998,12 @@ bool RendererVulkan::end_frame() {
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         vs_log("present out of date — dropping swapchain");
         destroy_swapchain();
+        // Soft failure: caller must recreate, not tear down the whole host.
         return false;
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         vs_log("vkQueuePresentKHR failed: %d", static_cast<int>(result));
+        destroy_swapchain();
         return false;
     }
     ++frames_presented_;

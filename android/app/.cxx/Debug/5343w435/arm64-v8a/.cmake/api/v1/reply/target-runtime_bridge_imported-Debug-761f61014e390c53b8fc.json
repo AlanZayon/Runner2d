@@ -1,0 +1,61 @@
+{
+	"abstract" : true,
+	"artifacts" : 
+	[
+		{
+			"path" : "C:/Users/alanz/source/repos/Runner2d/build/android-rust/aarch64-linux-android/release/libruntime_bridge.a"
+		}
+	],
+	"backtrace" : 3,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"include"
+		],
+		"files" : 
+		[
+			"native/CMakeLists.android.inc.cmake",
+			"native/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 4,
+				"parent" : 0
+			},
+			{
+				"file" : 0,
+				"parent" : 1
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 16,
+				"parent" : 2
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 11
+	},
+	"id" : "runtime_bridge_imported::@39f8f1661852dc709093",
+	"imported" : true,
+	"name" : "runtime_bridge_imported",
+	"nameOnDisk" : "libruntime_bridge.a",
+	"paths" : 
+	{
+		"build" : "native",
+		"source" : "native"
+	},
+	"sources" : [],
+	"type" : "STATIC_LIBRARY"
+}

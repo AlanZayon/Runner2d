@@ -32,6 +32,10 @@ void screens_draw(UiDraw& ui, AppScreen screen, const ScreenDrawParams& p) {
             0.75f);
         std::snprintf(line, sizeof(line), "Best score %u", p.best_score);
         ui.text_centered(cx, cy + 70.0f, line, kMuted, 0.7f);
+        if (p.version && p.version[0]) {
+            std::snprintf(line, sizeof(line), "v%s", p.version);
+            ui.text_centered(cx, p.viewport_h - 48.0f, line, kMuted, 0.65f);
+        }
         break;
 
     case AppScreen::Paused:
@@ -48,6 +52,14 @@ void screens_draw(UiDraw& ui, AppScreen screen, const ScreenDrawParams& p) {
         std::snprintf(line, sizeof(line), "vol M=%.2f  SFX=%.2f", p.vol_master, p.vol_sfx);
         ui.text_centered(cx, cy + 80.0f, line, kMuted, 0.7f);
         break;
+
+    case AppScreen::Countdown: {
+        // Compact badge at the top — world stays fully readable underneath.
+        const int n = p.countdown_value;
+        std::snprintf(line, sizeof(line), "%d", n);
+        ui.text_centered(cx, 56.0f, line, kAccent, 1.8f);
+        break;
+    }
 
     case AppScreen::GameOver: {
         ui.panel(cx - 240.0f, cy - 140.0f, 480.0f, 280.0f, kPanel);

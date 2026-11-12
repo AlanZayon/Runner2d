@@ -8,6 +8,7 @@ enum class AppScreen {
     Title,
     Playing,
     Paused,
+    Countdown,
     GameOver
 };
 
@@ -20,6 +21,9 @@ struct ScreenDrawParams {
     float vol_master = 1.0f;
     float vol_sfx = 1.0f;
     bool touch_ui = false;
+    const char* version = nullptr;
+    /** 1..3 while AppScreen::Countdown; 0 otherwise. */
+    int countdown_value = 0;
 };
 
 void screens_draw(UiDraw& ui, AppScreen screen, const ScreenDrawParams& p);

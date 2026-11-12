@@ -1,0 +1,21 @@
+# ninja log v5
+0	96	8162161236541527	volk-populate-prefix/src/volk-populate-stamp/volk-populate-mkdir	233c245c2f2e9afe
+0	96	8162161236541527	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-mkdir	233c245c2f2e9afe
+97	2248	8162161258056711	volk-populate-prefix/src/volk-populate-stamp/volk-populate-download	f5e44257e391a64
+97	2248	8162161258056711	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-download	f5e44257e391a64
+2248	2446	0	volk-populate-prefix/src/volk-populate-stamp/volk-populate-update	475fc5858b5b9910
+2248	2446	0	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-update	475fc5858b5b9910
+2446	2505	8162161260642300	volk-populate-prefix/src/volk-populate-stamp/volk-populate-patch	d2d2167af0952aa7
+2446	2505	8162161260642300	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-patch	d2d2167af0952aa7
+2505	2580	8162161261384022	volk-populate-prefix/src/volk-populate-stamp/volk-populate-configure	91e1736b70c9fc81
+2505	2580	8162161261384022	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-configure	91e1736b70c9fc81
+2581	2642	8162161262013434	volk-populate-prefix/src/volk-populate-stamp/volk-populate-build	393de78112a2802f
+2581	2642	8162161262013434	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-build	393de78112a2802f
+2642	2708	8162161262653909	volk-populate-prefix/src/volk-populate-stamp/volk-populate-install	23ee0f869ec72a45
+2642	2708	8162161262653909	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-install	23ee0f869ec72a45
+2708	2768	8162161263261671	volk-populate-prefix/src/volk-populate-stamp/volk-populate-test	787ef4ff431d31ff
+2708	2768	8162161263261671	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-test	787ef4ff431d31ff
+2768	2846	8162161264050268	CMakeFiles/volk-populate-complete	1f6fb8eff20ae9b2
+2768	2846	8162161264050268	volk-populate-prefix/src/volk-populate-stamp/volk-populate-done	1f6fb8eff20ae9b2
+2768	2846	8162161264050268	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/CMakeFiles/volk-populate-complete	1f6fb8eff20ae9b2
+2768	2846	8162161264050268	C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/535k1s2r/arm64-v8a/_deps/volk-subbuild/volk-populate-prefix/src/volk-populate-stamp/volk-populate-done	1f6fb8eff20ae9b2
