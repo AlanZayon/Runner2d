@@ -131,6 +131,12 @@ int run_game_loop(
     SaveStore save;
     save.load();
     GestureRecognizer gestures;
+    auto apply_gesture_thresholds = [&](int w, int h) {
+        const float shortest = static_cast<float>(w < h ? w : h);
+        const float min_dist = std::max(24.0f, shortest * 0.030f);
+        gestures.set_thresholds(min_dist, 0.65f);
+    };
+    apply_gesture_thresholds(platform.width(), platform.height());
     InputReplay replay;
     bool debug_overlay = config.debug_overlay;
     bool f3_edge = false;
@@ -192,28 +198,34 @@ int run_game_loop(
                 break;
             case PlatformEvent::Kind::FocusLost:
             case PlatformEvent::Kind::Pause:
+                // System background: freeze sim only. Don't enter the Pause menu — returning
+                // should continue the run. (Back/Esc still opens Paused intentionally.)
                 focus_paused = true;
-                if (screen == AppScreen::Playing) {
-                    screen = AppScreen::Paused;
-                }
                 if (!platform.native_window_handle()) {
                     renderer.lose_window_surface();
                 }
-                vs_log("Paused");
+                vs_log("Paused (focus/background)");
                 break;
             case PlatformEvent::Kind::FocusGained:
             case PlatformEvent::Kind::Resume:
                 focus_paused = false;
                 prev = platform.monotonic_seconds();
                 accumulator = 0.0;
-                if (platform.native_window_handle() && !renderer.has_surface()) {
-                    renderer.recreate_window_surface(
-                        platform.native_window_handle(),
-                        platform.width(),
-                        platform.height());
-                    scene.set_viewport(
-                        static_cast<float>(platform.width()),
-                        static_cast<float>(platform.height()));
+                if (platform.native_window_handle()) {
+                    const int w = platform.width();
+                    const int h = platform.height();
+                    if (w > 0 && h > 0) {
+                        if (!renderer.has_surface()) {
+                            if (!renderer.recreate_window_surface(
+                                    platform.native_window_handle(), w, h)) {
+                                vs_log("Resume: surface recreate deferred");
+                            }
+                        } else {
+                            renderer.resize(w, h);
+                        }
+                        scene.set_viewport(static_cast<float>(w), static_cast<float>(h));
+                        apply_gesture_thresholds(w, h);
+                    }
                 }
                 vs_log("Resumed");
                 break;
@@ -222,10 +234,11 @@ int run_game_loop(
                     if (platform.native_window_handle() && !renderer.has_surface()) {
                         renderer.recreate_window_surface(
                             platform.native_window_handle(), event.width, event.height);
-                    } else {
+                    } else if (renderer.has_surface()) {
                         renderer.resize(event.width, event.height);
                     }
                     scene.set_viewport(static_cast<float>(event.width), static_cast<float>(event.height));
+                    apply_gesture_thresholds(event.width, event.height);
                 }
                 break;
             case PlatformEvent::Kind::Back:
@@ -369,7 +382,18 @@ int run_game_loop(
                     }
                 } else {
                     input.consume_for_tick(&vs_input);
-                    gestures.consume_into(vs_input);
+                    gestures.consume_into(vs_input, platform.monotonic_seconds());
+                    // Phone tilt drives Falling Mode strafe; keyboard A/D wins if held.
+                    {
+                        const float tilt = platform.tilt_x();
+                        if (std::fabs(vs_input.move_x) < 0.05f && std::fabs(tilt) > 0.001f) {
+                            vs_input.move_x = tilt;
+                        }
+                    }
+                    // In-run taps must not fire QTE confirms (Title/GameOver only).
+                    if (screen == AppScreen::Playing) {
+                        vs_input.qte_pressed = 0;
+                    }
                 }
                 // Host owns restart via screens; don't let dead auto-reset steal GameOver.
                 vs_input.restart_pressed = 0;
@@ -416,7 +440,7 @@ int run_game_loop(
             // Still clear edge flags so they don't pile up.
             VsInputState discard{};
             input.consume_for_tick(&discard);
-            gestures.consume_into(discard);
+            gestures.consume_into(discard, platform.monotonic_seconds());
         }
 
         // Decay camera shake
@@ -431,6 +455,18 @@ int run_game_loop(
             save.consider_run(run.score, run.distance);
             screen = AppScreen::GameOver;
             vs_log("GAME OVER score=%u coins=%u dist=%.0f", run.score, run.coins, run.distance);
+        }
+
+        // After Android TERM/INIT, swapchain may be missing or 0×0 for a few frames — keep trying.
+        if (platform.native_window_handle() && !renderer.has_surface()) {
+            const int w = platform.width();
+            const int h = platform.height();
+            if (w > 0 && h > 0) {
+                if (renderer.recreate_window_surface(platform.native_window_handle(), w, h)) {
+                    scene.set_viewport(static_cast<float>(w), static_cast<float>(h));
+                    apply_gesture_thresholds(w, h);
+                }
+            }
         }
 
         if (renderer.has_surface() && renderer.begin_frame()) {

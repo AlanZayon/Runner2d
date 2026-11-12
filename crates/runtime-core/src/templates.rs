@@ -1,5 +1,6 @@
 //! Legacy thin wrappers — parametric generation lives in `generate`.
 
+use crate::config::GROUND_Y;
 use crate::generate::{generate_segment, safe_recovery as gen_safe};
 use crate::rng::XorShift64;
 use crate::segment::{SegmentDefinition, SegmentIntent};
@@ -83,11 +84,11 @@ pub fn templates_for(intent: SegmentIntent) -> &'static [TemplateMeta] {
 /// Build via parametric generator (seeded from template id for stability).
 pub fn build_template(meta: TemplateMeta, world_x0: f32) -> SegmentDefinition {
     let mut rng = XorShift64::from_seed(meta.id as u64 * 0x9E37 + meta.width.to_bits() as u64);
-    let mut seg = generate_segment(&mut rng, meta.intent, world_x0);
+    let mut seg = generate_segment(&mut rng, meta.intent, world_x0, GROUND_Y);
     seg.template_id = meta.id;
     seg
 }
 
 pub fn safe_recovery_width(world_x0: f32, width: f32) -> SegmentDefinition {
-    gen_safe(world_x0, width)
+    gen_safe(world_x0, width, GROUND_Y)
 }

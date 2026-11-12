@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/CMakeFiles/vulkanheaders-populate-complete.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-build.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-configure.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-download.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-install.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-patch.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-test.rule"
+		},
+		{
+			"file" : "C:/Users/alanz/source/repos/Runner2d/android/app/.cxx/Debug/2k3f383g/arm64-v8a/_deps/vulkanheaders-subbuild/vulkanheaders-populate-prefix/src/vulkanheaders-populate-stamp/vulkanheaders-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"vulkanheaders-populate"
+		],
+		"name" : "vulkanheaders-populate"
+	}
+}

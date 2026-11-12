@@ -20,11 +20,11 @@ pub enum ValidateError {
 
 pub type ValidateResult = Result<(), ValidateError>;
 
-/// Ground platforms at GROUND_Y (±2) covering the segment floor.
-pub fn ground_spans(platforms: &[PlatformSpec]) -> Vec<(f32, f32)> {
+/// Ground platforms near `ground_y` (±2) covering the segment floor.
+pub fn ground_spans_at(platforms: &[PlatformSpec], ground_y: f32) -> Vec<(f32, f32)> {
     let mut spans: Vec<(f32, f32)> = platforms
         .iter()
-        .filter(|p| (p.y - GROUND_Y).abs() < 2.0 && p.h >= 20.0)
+        .filter(|p| (p.y - ground_y).abs() < 2.0 && p.h >= 20.0)
         .map(|p| (p.x, p.x + p.w))
         .collect();
     spans.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -41,8 +41,12 @@ pub fn ground_spans(platforms: &[PlatformSpec]) -> Vec<(f32, f32)> {
     merged
 }
 
+pub fn ground_spans(platforms: &[PlatformSpec]) -> Vec<(f32, f32)> {
+    ground_spans_at(platforms, GROUND_Y)
+}
+
 pub fn max_gap_in_segment(seg: &SegmentDefinition) -> f32 {
-    let spans = ground_spans(&seg.platforms);
+    let spans = ground_spans_at(&seg.platforms, seg.ground_y);
     if spans.is_empty() {
         return seg.width;
     }
@@ -126,7 +130,10 @@ fn validate_intent_content(seg: &SegmentDefinition) -> ValidateResult {
             if shaft.pit_x1 <= shaft.pit_x0 + 40.0 || shaft.floor_y <= shaft.enter_y + 80.0 {
                 return Err(ValidateError::IntentMissingContent);
             }
-            // Must have entry lip, floor pad, and exit lip platforms.
+            if (shaft.exit_y - shaft.floor_y).abs() > 2.0 {
+                return Err(ValidateError::IntentMissingContent);
+            }
+            // Entry lip + deep floor/runway + walls.
             if seg.platforms.len() < 3 {
                 return Err(ValidateError::IntentMissingContent);
             }
@@ -140,7 +147,7 @@ pub fn validate_segment(seg: &SegmentDefinition) -> ValidateResult {
         return Err(ValidateError::EmptyPlatforms);
     }
 
-    let spans = ground_spans(&seg.platforms);
+    let spans = ground_spans_at(&seg.platforms, seg.ground_y);
     if spans.is_empty() {
         return Err(ValidateError::NoGroundCoverage);
     }
@@ -188,8 +195,15 @@ pub fn validate_continuity(segments: &[SegmentDefinition]) -> ValidateResult {
         if (b.world_x0 - a.world_x1()).abs() > 1.0 {
             return Err(ValidateError::EntryExitMismatch);
         }
-        let a_spans = ground_spans(&a.platforms);
-        let b_spans = ground_spans(&b.platforms);
+        // Continuity is checked on the shared exit/entry altitude.
+        // FallingShaft enters at enter_y and exits at floor_y (altitude drop).
+        let a_gy = a.exit_ground_y();
+        let b_gy = b.entry_ground_y();
+        if (a_gy - b_gy).abs() > 2.0 {
+            return Err(ValidateError::EntryExitMismatch);
+        }
+        let a_spans = ground_spans_at(&a.platforms, a_gy);
+        let b_spans = ground_spans_at(&b.platforms, b_gy);
         let a_end = a_spans.last().map(|s| s.1).unwrap_or(a.world_x0);
         let b_start = b_spans.first().map(|s| s.0).unwrap_or(b.world_x1());
         let seam_gap = b_start - a_end;
@@ -210,6 +224,7 @@ pub fn impossible_gap_segment(world_x0: f32) -> SegmentDefinition {
         template_id: 999,
         world_x0,
         width: 400.0,
+        ground_y: GROUND_Y,
         platforms: vec![
             PlatformSpec {
                 x: world_x0,
@@ -242,7 +257,7 @@ mod tests {
     #[test]
     fn recovery_valid() {
         let mut rng = XorShift64::from_seed(1);
-        let seg = generate_segment(&mut rng, SegmentIntent::Recovery, 0.0);
+        let seg = generate_segment(&mut rng, SegmentIntent::Recovery, 0.0, GROUND_Y);
         assert!(validate_segment(&seg).is_ok());
     }
 
@@ -261,6 +276,7 @@ mod tests {
             &mut XorShift64::from_seed(2),
             SegmentIntent::TeachDash,
             0.0,
+            GROUND_Y,
         );
         seg.hazards.clear();
         assert_eq!(
@@ -283,7 +299,7 @@ mod tests {
             SegmentIntent::FallingShaft,
             SegmentIntent::GhostChallenge,
         ] {
-            let seg = generate_segment(&mut rng, intent, 100.0);
+            let seg = generate_segment(&mut rng, intent, 100.0, GROUND_Y);
             assert!(
                 validate_segment(&seg).is_ok(),
                 "{intent:?}: {:?}",

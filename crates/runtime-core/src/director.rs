@@ -2,7 +2,7 @@
 
 use crate::components::HazardKind;
 use crate::config::{
-    DEFAULT_SEED, FALLING_SHAFT_EVERY_N, GENERATOR_VERSION, MAX_COURSE_ATTEMPTS,
+    DEFAULT_SEED, FALLING_SHAFT_EVERY_N, GENERATOR_VERSION, GROUND_Y, MAX_COURSE_ATTEMPTS,
     MAX_SEGMENT_REROLLS, SEGMENT_COUNT,
 };
 use crate::generate::{generate_segment, safe_recovery};
@@ -113,12 +113,13 @@ pub fn generate_next_segment(
     index: usize,
     prev_intent: Option<SegmentIntent>,
     world_x0: f32,
+    ground_y: f32,
 ) -> SegmentDefinition {
     let mut rng = XorShift64::from_seed(
         seed ^ ((index as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
     );
     let intent = pick_endless_intent(&mut rng, prev_intent, index);
-    let seg = pick_segment(&mut rng, intent, world_x0);
+    let seg = pick_segment(&mut rng, intent, world_x0, ground_y);
     // Soft continuity: if seam fails, force recovery pad.
     if let Some(prev) = prev_intent {
         let _ = prev;
@@ -130,15 +131,16 @@ fn pick_segment(
     rng: &mut XorShift64,
     intent: SegmentIntent,
     world_x0: f32,
+    ground_y: f32,
 ) -> SegmentDefinition {
     for _ in 0..MAX_SEGMENT_REROLLS {
-        let seg = generate_segment(rng, intent, world_x0);
+        let seg = generate_segment(rng, intent, world_x0, ground_y);
         if validate_segment(&seg).is_ok() {
             return seg;
         }
     }
     // Explicit recovery only after exhausted rerolls (counted in fingerprint).
-    let mut recovery = safe_recovery(world_x0, rng.gen_range_f32(180.0, 240.0));
+    let mut recovery = safe_recovery(world_x0, rng.gen_range_f32(180.0, 240.0), ground_y);
     recovery.template_id = 1; // mark as explicit fallback recovery
     recovery
 }
@@ -150,32 +152,35 @@ fn build_sequence(rng: &mut XorShift64) -> Vec<SegmentDefinition> {
 
     // Short RNG intro Recovery (not a fixed 480 corridor).
     let intro_w = rng.gen_range_f32(160.0, 220.0);
-    let mut first = generate_segment(rng, SegmentIntent::Recovery, x);
+    let mut gy = GROUND_Y;
+    let mut first = generate_segment(rng, SegmentIntent::Recovery, x, gy);
     // Force width into intro band by regenerating until roughly short, or clamp via safe.
     if first.width > 240.0 || first.width < 150.0 {
-        first = safe_recovery(x, intro_w);
+        first = safe_recovery(x, intro_w, gy);
         first.intent = SegmentIntent::Recovery;
         first.template_id = 100;
     }
     // Prefer the parametric recovery but ensure short: regenerate with capped attempts.
     for _ in 0..6 {
-        let cand = generate_segment(rng, SegmentIntent::Recovery, x);
+        let cand = generate_segment(rng, SegmentIntent::Recovery, x, gy);
         if cand.width <= 260.0 && validate_segment(&cand).is_ok() {
             first = cand;
             break;
         }
     }
     if first.width > 260.0 {
-        first = safe_recovery(x, intro_w);
+        first = safe_recovery(x, intro_w, gy);
         first.template_id = 100;
     }
 
     x = first.world_x1();
+    gy = first.exit_ground_y();
     segments.push(first);
 
     for intent in intents.into_iter().skip(1) {
-        let seg = pick_segment(rng, intent, x);
+        let seg = pick_segment(rng, intent, x, gy);
         x = seg.world_x1();
+        gy = seg.exit_ground_y();
         segments.push(seg);
     }
 
@@ -196,13 +201,20 @@ fn build_sequence(rng: &mut XorShift64) -> Vec<SegmentDefinition> {
             };
             if alt != segments[i].intent {
                 let mut cx = segments[i].world_x0;
-                let replacement = pick_segment(rng, alt, cx);
+                let mut cgy = if i > 0 {
+                    segments[i - 1].exit_ground_y()
+                } else {
+                    GROUND_Y
+                };
+                let replacement = pick_segment(rng, alt, cx, cgy);
                 cx = replacement.world_x1();
+                cgy = replacement.exit_ground_y();
                 segments[i] = replacement;
                 for j in (i + 1)..segments.len() {
                     let intent = segments[j].intent;
-                    let seg = pick_segment(rng, intent, cx);
+                    let seg = pick_segment(rng, intent, cx, cgy);
                     cx = seg.world_x1();
+                    cgy = seg.exit_ground_y();
                     segments[j] = seg;
                 }
             }
@@ -240,9 +252,11 @@ pub fn fallback_course(seed: u64) -> GeneratedCourse {
     ];
     // Even fallback keeps distinct intents (deterministic params via seed).
     let mut rng = XorShift64::from_seed(seed ^ 0xFA11_BACEu64);
+    let mut gy = GROUND_Y;
     for intent in spine {
-        let seg = pick_segment(&mut rng, intent, x);
+        let seg = pick_segment(&mut rng, intent, x, gy);
         x = seg.world_x1();
+        gy = seg.exit_ground_y();
         segments.push(seg);
     }
     course_from_segments(seed, segments)

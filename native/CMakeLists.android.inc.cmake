@@ -82,6 +82,8 @@ add_library(vs_ui STATIC
     ui/hud.hpp
     ui/screens.cpp
     ui/screens.hpp
+    ui/debug_overlay.cpp
+    ui/debug_overlay.hpp
 )
 target_include_directories(vs_ui PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -98,6 +100,8 @@ add_library(vertical_shift SHARED
     app/game_loop.hpp
     app/gameplay_scene.cpp
     app/gameplay_scene.hpp
+    app/input_replay.cpp
+    app/input_replay.hpp
     app/input_state.hpp
     app/log.hpp
     app/save_store.cpp

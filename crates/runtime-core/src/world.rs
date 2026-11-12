@@ -151,6 +151,8 @@ pub struct World {
     effects: EffectPool,
     run_mode: RunMode,
     falling: Option<FallingState>,
+    /// Current run-floor altitude (drops after a FallingShaft landing).
+    ground_y: f32,
     events: EventQueue,
     prev_grounded: bool,
     prev_qte_active: bool,
@@ -210,6 +212,7 @@ impl World {
             effects: EffectPool::new(),
             run_mode: RunMode::Run,
             falling: None,
+            ground_y: GROUND_Y,
             events: EventQueue::new(),
             prev_grounded: false,
             prev_qte_active: false,
@@ -327,7 +330,12 @@ impl World {
             .map(|s| s.world_x1())
             .unwrap_or(-40.0);
         let prev = self.segments.last().map(|s| s.intent);
-        let mut seg = director::generate_next_segment(self.seed, index, prev, world_x0);
+        let gy = self
+            .segments
+            .last()
+            .map(|s| s.exit_ground_y())
+            .unwrap_or(self.ground_y);
+        let mut seg = director::generate_next_segment(self.seed, index, prev, world_x0, gy);
         // Ensure seam continuity; if invalid, place a short recovery bridge.
         let mut ok = crate::validate::validate_segment(&seg).is_ok();
         if ok {
@@ -340,8 +348,9 @@ impl World {
             }
         }
         if !ok {
-            seg = crate::generate::safe_recovery(world_x0, 220.0);
+            seg = crate::generate::safe_recovery(world_x0, 220.0, gy);
         }
+        self.ground_y = seg.exit_ground_y();
         self.course_end = seg.world_x1();
         self.segments.push(seg);
         self.streamer.push_inactive();
@@ -421,6 +430,14 @@ impl World {
     pub fn set_viewport(&mut self, w: f32, h: f32) {
         self.camera.viewport_w = w.max(1.0);
         self.camera.viewport_h = h.max(1.0);
+        let zoom_w = self.camera.viewport_w / DESIGN_VIEWPORT_W;
+        let zoom_h = self.camera.viewport_h / DESIGN_VIEWPORT_H;
+        self.camera.zoom = zoom_w.max(zoom_h).max(1.0);
+    }
+
+    fn run_camera_target_y(player_center_y: f32, viewport_h: f32, zoom: f32) -> f32 {
+        let z = zoom.max(0.001);
+        player_center_y - (CAMERA_RUN_SCREEN_Y - 0.5) * viewport_h / z
     }
 
     pub fn camera(&self) -> CameraState {
@@ -645,7 +662,11 @@ impl World {
         self.player_id = player;
 
         self.camera.x = PLAYER_SPAWN_X + PLAYER_W * 0.5 + CAMERA_LOOKAHEAD * 0.3;
-        self.camera.y = PLAYER_SPAWN_Y + PLAYER_H * 0.5;
+        self.camera.y = Self::run_camera_target_y(
+            PLAYER_SPAWN_Y + PLAYER_H * 0.5,
+            self.camera.viewport_h,
+            self.camera.zoom,
+        );
     }
 
     fn spawn_segment_entities(&mut self, index: usize) {
@@ -796,6 +817,13 @@ impl World {
             .get(id)
             .map(|p| p.grounded)
             .unwrap_or(false);
+        if let Some(p) = self.players.get_mut(id) {
+            if grounded {
+                p.coyote_timer = COYOTE_SECONDS;
+            } else {
+                p.coyote_timer = (p.coyote_timer - dt).max(0.0);
+            }
+        }
         if grounded && !self.prev_grounded {
             let (x, y) = self.player_xy();
             self.push_event(GameEventKind::Land, x, y, 0);
@@ -862,8 +890,12 @@ impl World {
         let state = self.players.get(id).map(|p| p.state).unwrap_or(state);
 
         // Start dash (edge press → fixed DASH_DURATION; hold does not extend)
+        // Rolling blocks dash so LowBar crouch hitbox is not replaced mid-slide.
         if input.dash_pressed
-            && !matches!(state, PlayerState::Dashing | PlayerState::Dead)
+            && !matches!(
+                state,
+                PlayerState::Dashing | PlayerState::Rolling | PlayerState::Dead
+            )
             && self
                 .players
                 .get(id)
@@ -876,13 +908,17 @@ impl World {
                 p.dash_cooldown = DASH_COOLDOWN;
                 p.jump_buffer = 0.0;
             }
+            // Flatten vertical so air dash is a straight horizontal burst (not jump/fall diagonal).
+            if let Some(vel) = self.velocities.get_mut(id) {
+                vel.y = 0.0;
+            }
             self.restore_standing_collider(id);
             let (x, y) = self.player_xy();
             self.push_event(GameEventKind::Dash, x, y, 0);
         }
 
         // Roll: one timed crouch per press. Hold does not extend or chain.
-        // May start airborne so Jump→Roll into a LowBar stays viable.
+        // Airborne roll dives hard to the ground (Subway-style) and stays crouched for LowBars.
         if !input.roll_held {
             if let Some(p) = self.players.get_mut(id) {
                 p.roll_gate = false;
@@ -897,7 +933,7 @@ impl World {
                 PlayerState::Dashing | PlayerState::Rolling | PlayerState::Dead
             )
         {
-            self.begin_roll(id);
+            self.begin_roll(id, input.jump_pressed);
             if let Some(p) = self.players.get_mut(id) {
                 p.roll_gate = true;
             }
@@ -909,10 +945,25 @@ impl World {
         let run_speed = self.run_speed;
         let move_mod = self.abilities.movement_modifiers();
         let rolling = state == PlayerState::Rolling;
-        // Roll bypasses Slow Fall so the player can still drop quickly.
-        let g_scale = if rolling { 1.0 } else { move_mod.gravity_scale };
+        let airborne_roll = rolling
+            && !self
+                .players
+                .get(id)
+                .map(|p| p.grounded)
+                .unwrap_or(false);
+        let falling_mode = matches!(self.run_mode, RunMode::FallingEnter | RunMode::Falling);
+        // Roll bypasses Slow Fall; Falling Mode uses floaty “rocket” gravity.
+        let g_scale = if rolling {
+            1.0
+        } else if falling_mode {
+            move_mod.gravity_scale * FALLING_GRAVITY_SCALE
+        } else {
+            move_mod.gravity_scale
+        };
         let fall_scale = if rolling {
             1.0
+        } else if falling_mode {
+            move_mod.max_fall_scale * FALLING_MAX_FALL_SCALE
         } else {
             move_mod.max_fall_scale
         };
@@ -925,8 +976,15 @@ impl World {
         let mut jumped = false;
         {
             let grounded = self.players.get(id).map(|p| p.grounded).unwrap_or(false);
-            let can_jump = grounded
-                && !matches!(state, PlayerState::Dashing | PlayerState::Rolling)
+            let coyote = self
+                .players
+                .get(id)
+                .map(|p| p.coyote_timer > 0.0)
+                .unwrap_or(false);
+            let roll_supported = rolling && self.feet_have_support(id);
+            // Jump cancels an active ground roll (Subway-style crouch → jump).
+            let can_jump = (grounded || coyote || roll_supported)
+                && !matches!(state, PlayerState::Dashing | PlayerState::Dead)
                 && self
                     .players
                     .get(id)
@@ -939,6 +997,8 @@ impl World {
                             // Dash boosts horizontal intent during Falling Mode.
                             let dir = if input.move_x.abs() > 0.1 {
                                 input.move_x.signum()
+                            } else if vel.x.abs() > 20.0 {
+                                vel.x.signum()
                             } else {
                                 1.0
                             };
@@ -946,25 +1006,34 @@ impl World {
                         } else {
                             vel.x = run_speed + DASH_BONUS;
                         }
-                        // Keep vertical from gravity lightly
-                        vel.y += GRAVITY * g_scale * dt * 0.35;
+                        // Hold altitude during the dash window; gravity resumes when it ends.
+                        vel.y = 0.0;
                     }
                     PlayerState::Dead => {}
                     _ => {
                         if falling_strafe {
-                            vel.x = input.move_x.clamp(-1.0, 1.0) * FALLING_STRAFE_SPEED;
+                            // Ease toward tilt target so banked turns feel smooth, not binary.
+                            let target = input.move_x.clamp(-1.0, 1.0) * FALLING_STRAFE_SPEED;
+                            let alpha = 1.0 - (-FALLING_STRAFE_RESPONSIVENESS * dt).exp();
+                            vel.x += (target - vel.x) * alpha;
+                            vel.y += GRAVITY * g_scale * dt;
                         } else if self.run_mode == RunMode::FallingExit {
-                            // Hold still horizontally while snapping to exit lip.
-                            vel.x = 0.0;
+                            // Planted on the deep floor — resume autorun, no gravity tug.
+                            vel.x = run_speed;
+                            vel.y = 0.0;
                         } else {
                             // Auto-run only — no strafe / no backpedal.
                             let _ = input.move_x;
                             vel.x = run_speed;
+                            vel.y += GRAVITY * g_scale * dt;
                         }
-                        vel.y += GRAVITY * g_scale * dt;
                     }
                 }
-                let max_fall = MAX_FALL_SPEED * fall_scale;
+                let max_fall = if airborne_roll {
+                    ROLL_AIR_MAX_FALL
+                } else {
+                    MAX_FALL_SPEED * fall_scale
+                };
                 if vel.y > max_fall {
                     vel.y = max_fall;
                 }
@@ -972,14 +1041,24 @@ impl World {
                 if can_jump {
                     vel.y = JUMP_VELOCITY;
                     jumped = true;
-                } else if !input.jump_held && vel.y < 0.0 && state != PlayerState::Dashing {
+                } else if !input.jump_held
+                    && vel.y < 0.0
+                    && state != PlayerState::Dashing
+                    && state != PlayerState::Rolling
+                {
+                    // Air-roll owns vertical velocity (dive); don't short-hop cut against the slam.
                     vel.y *= 0.55;
                 }
             }
             if jumped {
+                if rolling {
+                    self.restore_standing_collider(id);
+                }
                 if let Some(p) = self.players.get_mut(id) {
                     p.grounded = false;
                     p.jump_buffer = 0.0;
+                    p.coyote_timer = 0.0;
+                    p.state_timer = 0.0;
                     p.state = PlayerState::Jumping;
                 }
             }
@@ -1034,30 +1113,29 @@ impl World {
                 }
             }
             RunMode::FallingExit => {
+                // Settle briefly on the deep floor, then resume horizontal run there.
                 if let Some(f) = self.falling.as_mut() {
                     f.timer += dt;
-                    let t = (f.timer / FALLING_EXIT_DURATION).clamp(0.0, 1.0);
                     let id = self.player_id;
-                    let (ex, ey) = (f.exit_x + 8.0, f.exit_y - PLAYER_H - 2.0);
+                    let ey = f.floor_y - PLAYER_H;
+                    let runway_x = f.shaft_x1;
                     if let Some(tr) = self.transforms.get_mut(id) {
-                        tr.x += (ex - tr.x) * t.max(0.15);
-                        tr.y += (ey - tr.y) * t.max(0.15);
+                        tr.y = ey;
+                        // Slide onto the runway so the next frames have solid ground underfoot.
+                        if tr.x < runway_x {
+                            tr.x = (tr.x + self.run_speed * dt).min(runway_x);
+                        }
                     }
                     if let Some(v) = self.velocities.get_mut(id) {
-                        v.x = 0.0;
                         v.y = 0.0;
+                        v.x = self.run_speed;
+                    }
+                    if let Some(p) = self.players.get_mut(id) {
+                        p.grounded = true;
+                        p.state = PlayerState::Running;
                     }
                     if f.exit_done() {
-                        if let Some(tr) = self.transforms.get_mut(id) {
-                            tr.x = ex;
-                            tr.y = ey;
-                        }
-                        self.run_mode = RunMode::Run;
-                        self.falling = None;
-                        if let Some(p) = self.players.get_mut(id) {
-                            p.grounded = true;
-                            p.state = PlayerState::Running;
-                        }
+                        self.finish_falling_on_floor();
                     }
                 }
             }
@@ -1089,6 +1167,10 @@ impl World {
             return;
         };
         if px < shaft.pit_x0 || px > shaft.pit_x1 {
+            return;
+        }
+        // Only tumble in near the pit lip — never re-enter once already deep / on the floor.
+        if t.y + PLAYER_H > shaft.enter_y + 160.0 {
             return;
         }
         // Over the pit and airborne → enter Falling Mode.
@@ -1124,21 +1206,67 @@ impl World {
                 .unwrap_or(false);
 
         if on_floor || f.timed_out() {
-            let t = self.transforms.get(id).copied();
-            if let Some(tr) = t {
-                self.effects
-                    .spawn_burst(tr.x, tr.y, 0.3, 1.0, 0.5, 10);
-                self.push_event(GameEventKind::FallExit, tr.x, tr.y, 0);
-            }
-            if let Some(fs) = self.falling.as_mut() {
-                fs.timer = 0.0;
-            }
-            self.run_mode = RunMode::FallingExit;
-            self.restore_standing_collider(id);
+            self.trigger_falling_exit();
         }
     }
 
-    fn begin_roll(&mut self, id: EntityId) {
+    /// Leave the shaft onto the deep floor runway and resume horizontal run (no death / no climb).
+    fn trigger_falling_exit(&mut self) {
+        if !matches!(self.run_mode, RunMode::FallingEnter | RunMode::Falling) {
+            return;
+        }
+        let id = self.player_id;
+        let (x, y) = self.player_xy();
+        self.effects.spawn_burst(x, y, 0.3, 1.0, 0.5, 10);
+        self.push_event(GameEventKind::FallExit, x, y, 0);
+        if let Some(fs) = self.falling.as_mut() {
+            fs.timer = 0.0;
+            let floor_y = fs.floor_y;
+            let runway_x = fs.shaft_x1;
+            let x1 = fs.exit_x;
+            self.ground_y = floor_y;
+            if let Some(tr) = self.transforms.get_mut(id) {
+                tr.y = floor_y - PLAYER_H;
+                // Prefer the runway start so horizontal continue is immediate.
+                tr.x = tr.x.clamp(runway_x, x1).max(runway_x);
+            }
+        }
+        if let Some(v) = self.velocities.get_mut(id) {
+            v.y = 0.0;
+            v.x = self.run_speed;
+        }
+        if let Some(p) = self.players.get_mut(id) {
+            p.grounded = true;
+            p.state = PlayerState::Running;
+        }
+        self.restore_standing_collider(id);
+        self.run_mode = RunMode::FallingExit;
+    }
+
+    fn finish_falling_on_floor(&mut self) {
+        let id = self.player_id;
+        if let Some(f) = self.falling {
+            self.ground_y = f.floor_y;
+            if let Some(tr) = self.transforms.get_mut(id) {
+                tr.y = f.floor_y - PLAYER_H;
+                tr.x = tr.x.max(f.shaft_x1);
+            }
+        }
+        self.run_mode = RunMode::Run;
+        self.falling = None;
+        if let Some(p) = self.players.get_mut(id) {
+            p.grounded = true;
+            p.state = PlayerState::Running;
+            p.coyote_timer = COYOTE_SECONDS;
+        }
+        if let Some(v) = self.velocities.get_mut(id) {
+            v.y = 0.0;
+            v.x = self.run_speed;
+        }
+    }
+
+    fn begin_roll(&mut self, id: EntityId, preserve_jump_buffer: bool) {
+        let grounded = self.players.get(id).map(|p| p.grounded).unwrap_or(false);
         let base_h = self.players.get(id).map(|p| p.base_h).unwrap_or(PLAYER_H);
         let new_h = base_h * ROLL_HEIGHT_SCALE;
         if let Some(c) = self.colliders.get_mut(id) {
@@ -1154,7 +1282,50 @@ impl World {
         if let Some(p) = self.players.get_mut(id) {
             p.state = PlayerState::Rolling;
             p.state_timer = ROLL_DURATION;
+            if !preserve_jump_buffer {
+                p.jump_buffer = 0.0;
+            }
         }
+        // Mid-air swipe down: cancel the jump arc and slam toward the ground.
+        if !grounded {
+            if let Some(vel) = self.velocities.get_mut(id) {
+                vel.y = vel.y.max(ROLL_AIR_SLAM_VELOCITY);
+            }
+        }
+    }
+
+    /// True when a platform top is under the player's feet (used for roll→jump forgiveness).
+    fn feet_have_support(&self, id: EntityId) -> bool {
+        let Some(body) = self.player_aabb(id) else {
+            return false;
+        };
+        let probe = Aabb::new(
+            body.x + 1.0,
+            body.bottom() - 2.0,
+            (body.w - 2.0).max(2.0),
+            8.0,
+        );
+        let (x0, x1) = self.query_x_window();
+        for (pid, _) in self.platforms.iter() {
+            let Some(t) = self.transforms.get(pid) else {
+                continue;
+            };
+            let Some(c) = self.colliders.get(pid) else {
+                continue;
+            };
+            if t.x + c.w < x0 || t.x > x1 {
+                continue;
+            }
+            let solid = Aabb::new(t.x, t.y, c.w, c.h);
+            if !probe.overlaps(solid) {
+                continue;
+            }
+            let gap = (body.bottom() - solid.top()).abs();
+            if gap <= 8.0 {
+                return true;
+            }
+        }
+        false
     }
 
     fn end_special_state(&mut self, id: EntityId, grounded: bool) {
@@ -1531,6 +1702,16 @@ impl World {
                 HazardKind::LowBar => state != PlayerState::Rolling,
             };
             if lethal {
+                // In Falling Mode, a hit ejects back to the horizontal run — no game over.
+                if matches!(
+                    self.run_mode,
+                    RunMode::FallingEnter | RunMode::Falling | RunMode::FallingExit
+                ) {
+                    if matches!(self.run_mode, RunMode::FallingEnter | RunMode::Falling) {
+                        self.trigger_falling_exit();
+                    }
+                    return;
+                }
                 self.kill_player();
                 return;
             }
@@ -1601,19 +1782,58 @@ impl World {
         self.push_event(GameEventKind::Death, x, y, 0);
     }
 
+    /// Run-floor altitude at `x` (not the streamed tip — tip may already be a deep shaft floor).
+    fn local_ground_y_at(&self, x: f32) -> f32 {
+        for seg in &self.segments {
+            if x < seg.world_x0 || x > seg.world_x1() {
+                continue;
+            }
+            if let Some(sh) = seg.shaft {
+                // Inside / before the pit opening still uses the entry lip altitude.
+                if x < sh.pit_x1 {
+                    return sh.enter_y;
+                }
+                return sh.exit_y;
+            }
+            return seg.ground_y;
+        }
+        self.ground_y
+    }
+
     fn check_fall_death(&mut self) {
         let id = self.player_id;
         let Some(t) = self.transforms.get(id) else {
             return;
         };
-        if t.y > DEATH_Y
+        let falling_like = self.run_mode.is_falling_like();
+        // Falling uses the active shaft floor. Normal gaps use the *local* floor under the
+        // player — never World.ground_y, which tracks the generated tip and jumps down when
+        // a FallingShaft is streamed ahead (that made death absurdly deep).
+        let (altitude, margin) = if falling_like {
+            let floor = self
+                .falling
+                .map(|f| f.floor_y)
+                .unwrap_or_else(|| self.local_ground_y_at(t.x));
+            (floor, FALLING_DEATH_Y_MARGIN)
+        } else {
+            (self.local_ground_y_at(t.x), DEATH_Y_MARGIN)
+        };
+        let death_line = altitude + margin;
+        if t.y > death_line
             && self
                 .players
                 .get(id)
                 .map(|p| p.state != PlayerState::Dead)
                 .unwrap_or(false)
         {
-            self.kill_player();
+            // Deep fall inside the shaft → recover to the floor runway instead of game over.
+            if falling_like {
+                if matches!(self.run_mode, RunMode::FallingEnter | RunMode::Falling) {
+                    self.trigger_falling_exit();
+                }
+            } else {
+                self.kill_player();
+            }
         }
     }
 
@@ -1728,15 +1948,17 @@ impl World {
         let Some(c) = self.colliders.get(id) else {
             return;
         };
+        let player_cx = t.x + c.w * 0.5;
+        let player_cy = t.y + c.h * 0.5;
         let (target_x, target_y) = if self.run_mode.is_falling_like() {
             (
-                t.x + c.w * 0.5 + CAMERA_FALL_X_LOOKAHEAD,
-                t.y + c.h * 0.5 + CAMERA_FALL_LOOKAHEAD,
+                player_cx + CAMERA_FALL_X_LOOKAHEAD,
+                player_cy + CAMERA_FALL_LOOKAHEAD,
             )
         } else {
             (
-                t.x + c.w * 0.5 + CAMERA_LOOKAHEAD * 0.5,
-                t.y + c.h * 0.5,
+                player_cx + CAMERA_LOOKAHEAD * 0.5,
+                Self::run_camera_target_y(player_cy, self.camera.viewport_h, self.camera.zoom),
             )
         };
         let alpha = 1.0 - (-CAMERA_FOLLOW_LERP * dt).exp();
@@ -1747,6 +1969,20 @@ impl World {
     pub fn extract_sprites(&mut self, out: &mut Vec<ExtractSprite>) {
         let t0 = Instant::now();
         out.clear();
+        let falling_like = self.run_mode.is_falling_like();
+        let player_y = self
+            .transforms
+            .get(self.player_id)
+            .map(|t| t.y)
+            .unwrap_or(0.0);
+        let active_pit = self.falling.map(|f| (f.shaft_x0, f.shaft_x1));
+        // Floor stays hidden only during the drop — reveal on FallingExit landing.
+        let hide_floor_y = if matches!(self.run_mode, RunMode::FallingEnter | RunMode::Falling)
+        {
+            self.falling.map(|f| f.floor_y)
+        } else {
+            None
+        };
         for (id, sprite) in self.sprites.iter() {
             if !self.entities.is_alive(id) {
                 continue;
@@ -1754,6 +1990,37 @@ impl World {
             let Some(t) = self.transforms.get(id) else {
                 continue;
             };
+            // Don't preview FallingShaft walls / hazards / floor while not in that fall.
+            // Entry lip (and deep runway only after the player is already down there) may show.
+            if let Some(&seg_i) = self.segment_of.get(id) {
+                if let Some(seg) = self.segments.get(seg_i as usize) {
+                    if let Some(shaft) = seg.shaft {
+                        let in_active = active_pit
+                            .map(|(x0, x1)| {
+                                (shaft.pit_x0 - x0).abs() < 2.0 && (shaft.pit_x1 - x1).abs() < 2.0
+                            })
+                            .unwrap_or(false);
+                        if !(falling_like && in_active) {
+                            let at_enter = (t.y - shaft.enter_y).abs() < 3.0;
+                            let at_exit = (t.y - shaft.exit_y).abs() < 3.0;
+                            let player_on_deep =
+                                player_y + PLAYER_H > shaft.exit_y - 48.0;
+                            if !(at_enter || (at_exit && player_on_deep)) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            // During the long drop, keep the landing floor off-screen until near arrival.
+            if let Some(floor_y) = hide_floor_y {
+                if self.platforms.get(id).is_some()
+                    && (t.y - floor_y).abs() < 3.0
+                    && (floor_y - player_y) > FALLING_FLOOR_REVEAL_DIST
+                {
+                    continue;
+                }
+            }
             // Power-ups bob visually (hitbox stays fixed) so they read against scenery.
             let bob = if self.powerups.get(id).is_some() {
                 (self.run_time * 6.0).sin() * 4.0
@@ -1893,6 +2160,51 @@ mod tests {
     }
 
     #[test]
+    fn air_dash_goes_horizontal_not_diagonal() {
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        let pid = world.player_id;
+        let mut jump = InputSnapshot::default();
+        jump.jump_pressed = true;
+        jump.jump_held = true;
+        world.tick(jump, 1.0 / 60.0);
+        jump.jump_pressed = false;
+        for _ in 0..6 {
+            world.tick(jump, 1.0 / 60.0);
+        }
+        assert!(!world.players.get(pid).unwrap().grounded);
+        assert!(world.velocities.get(pid).unwrap().y.abs() > 1.0);
+        let y0 = world.transforms.get(pid).unwrap().y;
+
+        let mut dash = InputSnapshot::default();
+        dash.dash_pressed = true;
+        world.tick(dash, 1.0 / 60.0);
+        assert_eq!(world.players.get(pid).unwrap().state, PlayerState::Dashing);
+        assert!(
+            world.velocities.get(pid).unwrap().y.abs() < 0.01,
+            "air dash must cancel vertical velocity"
+        );
+
+        let hold = InputSnapshot::default();
+        let steps = (DASH_DURATION * 60.0).ceil() as u32;
+        for _ in 0..steps.saturating_sub(1) {
+            world.tick(hold, 1.0 / 60.0);
+            if world.players.get(pid).unwrap().state == PlayerState::Dashing {
+                assert!(
+                    world.velocities.get(pid).unwrap().y.abs() < 0.01,
+                    "dash should stay flat while active"
+                );
+            }
+        }
+        let y1 = world.transforms.get(pid).unwrap().y;
+        assert!(
+            (y1 - y0).abs() < 3.0,
+            "air dash should not drift vertically, dy={}",
+            y1 - y0
+        );
+    }
+
+    #[test]
     fn roll_shrinks_collider() {
         let mut world = World::new();
         land(&mut world);
@@ -1906,6 +2218,143 @@ mod tests {
             world.players.get(world.player_id).unwrap().state,
             PlayerState::Rolling
         );
+    }
+
+    #[test]
+    fn jump_cancels_ground_roll() {
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        let pid = world.player_id;
+        let standing_h = world.colliders.get(pid).unwrap().h;
+
+        let mut roll = InputSnapshot::default();
+        roll.roll_held = true;
+        world.tick(roll, 1.0 / 60.0);
+        assert_eq!(world.players.get(pid).unwrap().state, PlayerState::Rolling);
+        assert!(world.colliders.get(pid).unwrap().h < standing_h);
+        // Settle feet without manually forcing grounded (probe/coyote must suffice).
+        world.tick(InputSnapshot::default(), 1.0 / 60.0);
+
+        // Mid-roll jump (swipe up while crouched).
+        let mut jump = InputSnapshot::default();
+        jump.jump_pressed = true;
+        jump.jump_held = true;
+        world.tick(jump, 1.0 / 60.0);
+        assert_eq!(world.players.get(pid).unwrap().state, PlayerState::Jumping);
+        assert!(!world.players.get(pid).unwrap().grounded);
+        assert!((world.colliders.get(pid).unwrap().h - standing_h).abs() < 0.1);
+        assert!(world.velocities.get(pid).unwrap().y < 0.0);
+    }
+
+    #[test]
+    fn coyote_allows_jump_shortly_after_leaving_ground() {
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        let pid = world.player_id;
+        if let Some(p) = world.players.get_mut(pid) {
+            p.grounded = false;
+            p.coyote_timer = COYOTE_SECONDS;
+            p.state = PlayerState::Falling;
+        }
+        let mut jump = InputSnapshot::default();
+        jump.jump_pressed = true;
+        jump.jump_held = true;
+        world.tick(jump, 1.0 / 60.0);
+        assert_eq!(world.players.get(pid).unwrap().state, PlayerState::Jumping);
+        assert!(world.velocities.get(pid).unwrap().y < 0.0);
+    }
+
+    #[test]
+    fn jump_buffer_fires_near_landing() {
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        let pid = world.player_id;
+        if let Some(t) = world.transforms.get_mut(pid) {
+            t.y = GROUND_Y - PLAYER_H - 36.0;
+        }
+        if let Some(v) = world.velocities.get_mut(pid) {
+            v.y = 400.0;
+        }
+        if let Some(p) = world.players.get_mut(pid) {
+            p.grounded = false;
+            p.state = PlayerState::Falling;
+            p.coyote_timer = 0.0;
+        }
+        let mut jump = InputSnapshot::default();
+        jump.jump_pressed = true;
+        world.tick(jump, 1.0 / 60.0);
+        jump.jump_pressed = false;
+        jump.jump_held = true;
+        let mut saw_jump = false;
+        for _ in 0..40 {
+            world.tick(jump, 1.0 / 60.0);
+            if world.players.get(pid).unwrap().state == PlayerState::Jumping {
+                saw_jump = true;
+                break;
+            }
+        }
+        assert!(saw_jump, "buffered jump should fire on/after landing");
+    }
+
+    #[test]
+    fn dash_blocked_while_rolling() {
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        let pid = world.player_id;
+        let mut roll = InputSnapshot::default();
+        roll.roll_held = true;
+        world.tick(roll, 1.0 / 60.0);
+        assert_eq!(world.players.get(pid).unwrap().state, PlayerState::Rolling);
+
+        let mut dash = InputSnapshot::default();
+        dash.dash_pressed = true;
+        world.tick(dash, 1.0 / 60.0);
+        assert_eq!(
+            world.players.get(pid).unwrap().state,
+            PlayerState::Rolling,
+            "dash must not interrupt an active roll"
+        );
+    }
+
+    #[test]
+    fn air_roll_slams_toward_ground() {
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        let pid = world.player_id;
+        // Launch into a jump, then swipe-down roll mid-air.
+        let mut jump = InputSnapshot::default();
+        jump.jump_pressed = true;
+        jump.jump_held = true;
+        world.tick(jump, 1.0 / 60.0);
+        jump.jump_pressed = false;
+        for _ in 0..8 {
+            world.tick(jump, 1.0 / 60.0);
+        }
+        assert!(!world.players.get(pid).unwrap().grounded);
+        let y_before = world.transforms.get(pid).unwrap().y;
+
+        let mut roll = InputSnapshot::default();
+        roll.roll_held = true;
+        world.tick(roll, 1.0 / 60.0);
+        assert_eq!(world.players.get(pid).unwrap().state, PlayerState::Rolling);
+        let vy = world.velocities.get(pid).unwrap().y;
+        assert!(
+            vy >= ROLL_AIR_SLAM_VELOCITY - 1.0,
+            "expected dive velocity, got {vy}"
+        );
+
+        // Dive should reach ground faster than continuing the jump arc.
+        let mut landed = false;
+        for _ in 0..45 {
+            world.tick(InputSnapshot::default(), 1.0 / 60.0);
+            if world.players.get(pid).unwrap().grounded {
+                landed = true;
+                break;
+            }
+        }
+        assert!(landed, "air-roll dive should hit the ground quickly");
+        let y_after = world.transforms.get(pid).unwrap().y;
+        assert!(y_after > y_before, "should move downward after dive");
     }
 
     #[test]
@@ -2160,9 +2609,26 @@ mod tests {
                     .unwrap_or(false)
             });
             if !in_shaft_pit {
+                // Run altitude can drop after FallingShaft — use the segment's run altitude at probe.
+                let local_gy = world
+                    .segments()
+                    .iter()
+                    .find(|s| probe >= s.world_x0 && probe <= s.world_x1())
+                    .map(|s| {
+                        if let Some(sh) = s.shaft {
+                            if probe < sh.pit_x0 {
+                                sh.enter_y
+                            } else {
+                                sh.exit_y
+                            }
+                        } else {
+                            s.ground_y
+                        }
+                    })
+                    .unwrap_or(GROUND_Y);
                 let covered = world.segments().iter().any(|s| {
                     s.platforms.iter().any(|p| {
-                        (p.y - GROUND_Y).abs() < 3.0 && p.x <= probe && p.x + p.w >= probe
+                        (p.y - local_gy).abs() < 3.0 && p.x <= probe && p.x + p.w >= probe
                     })
                 });
                 // Allow intentional gaps: if not covered, a platform must exist within MAX_SAFE_GAP.
@@ -2170,11 +2636,17 @@ mod tests {
                     let nearest = world
                         .segments()
                         .iter()
-                        .flat_map(|s| s.platforms.iter())
-                        .filter(|p| {
-                            (p.y - GROUND_Y).abs() < 3.0 && p.x + p.w >= probe - MAX_SAFE_GAP
+                        .flat_map(|s| {
+                            let gy = s.shaft.map(|sh| sh.exit_y).unwrap_or(s.ground_y);
+                            let enter = s.shaft.map(|sh| sh.enter_y);
+                            s.platforms.iter().map(move |p| (gy, enter, p))
                         })
-                        .map(|p| p.x)
+                        .filter(|(gy, enter, p)| {
+                            let at_exit = (p.y - *gy).abs() < 3.0;
+                            let at_enter = enter.map(|e| (p.y - e).abs() < 3.0).unwrap_or(false);
+                            (at_exit || at_enter) && p.x + p.w >= probe - MAX_SAFE_GAP
+                        })
+                        .map(|(_, _, p)| p.x)
                         .filter(|&x| x >= probe)
                         .fold(f32::MAX, f32::min);
                     assert!(
@@ -2185,9 +2657,31 @@ mod tests {
             }
             // Step player forward at current run speed (ignore collisions for this stress test).
             let spd = world.run_speed();
+            let px_now = world
+                .transforms
+                .get(world.player_id)
+                .map(|t| t.x)
+                .unwrap_or(0.0)
+                + spd / 60.0;
+            let gy = world
+                .segments()
+                .iter()
+                .find(|s| px_now >= s.world_x0 && px_now <= s.world_x1())
+                .map(|s| {
+                    if let Some(sh) = s.shaft {
+                        if px_now < sh.pit_x0 {
+                            sh.enter_y
+                        } else {
+                            sh.exit_y
+                        }
+                    } else {
+                        s.ground_y
+                    }
+                })
+                .unwrap_or(GROUND_Y);
             if let Some(t) = world.transforms.get_mut(world.player_id) {
-                t.x += spd / 60.0;
-                t.y = GROUND_Y - PLAYER_H - 2.0;
+                t.x = px_now;
+                t.y = gy - PLAYER_H - 2.0;
                 max_x = t.x.max(max_x);
             }
             world.update_run_speed(1.0 / 60.0);
@@ -2300,7 +2794,7 @@ mod tests {
         assert!(vy_slow < MAX_FALL_SPEED * SLOW_FALL_MAX_FALL_SCALE + 1.0);
 
         // Rolling ignores slow-fall cap.
-        world.begin_roll(pid);
+        world.begin_roll(pid, false);
         world.tick(input, 1.0 / 60.0);
         let vy_roll = world.velocities.get(pid).unwrap().y;
         assert!(vy_roll >= vy_slow - 0.1);
@@ -2506,7 +3000,7 @@ mod tests {
         use crate::generate::generate_segment;
         use crate::rng::XorShift64;
         let mut rng = XorShift64::from_seed(99);
-        let shaft = generate_segment(&mut rng, SegmentIntent::FallingShaft, 0.0);
+        let shaft = generate_segment(&mut rng, SegmentIntent::FallingShaft, 0.0, GROUND_Y);
         assert!(shaft.shaft.is_some());
         let course = GeneratedCourse {
             seed: 99,
@@ -2587,6 +3081,11 @@ mod tests {
     #[test]
     fn falling_camera_looks_down() {
         let mut world = force_falling_shaft_world();
+        // Clear shaft hazards so the camera test is not interrupted by soft-exit.
+        let hz: Vec<_> = world.hazards.iter().map(|(id, _)| id).collect();
+        for id in hz {
+            world.despawn_entity(id);
+        }
         let shaft = world.segments()[0].shaft.unwrap();
         let pid = world.player_id;
         if let Some(t) = world.transforms.get_mut(pid) {
@@ -2596,18 +3095,145 @@ mod tests {
         if let Some(p) = world.players.get_mut(pid) {
             p.grounded = false;
         }
+        // Start near the player so follow lerp can reach fall lookahead quickly.
+        {
+            let t = world.transforms.get(pid).unwrap();
+            let c = world.colliders.get(pid).unwrap();
+            world.camera.x = t.x + c.w * 0.5;
+            world.camera.y = t.y + c.h * 0.5;
+        }
         world.try_begin_falling();
         let input = InputSnapshot::default();
-        for _ in 0..20 {
+        for _ in 0..45 {
             world.tick(input, 1.0 / 60.0);
         }
-        let py = world.transforms.get(pid).unwrap().y;
+        let t = world.transforms.get(pid).unwrap();
+        let c = world.colliders.get(pid).unwrap();
+        let player_cy = t.y + c.h * 0.5;
         let cam_y = world.camera().y;
         assert!(
-            cam_y > py,
-            "camera should look ahead downward: cam={cam_y} player={py}"
+            cam_y > player_cy,
+            "camera should look ahead downward: cam={cam_y} player_cy={player_cy}"
         );
         assert_eq!(world.run_state().falling, 1);
+    }
+
+    #[test]
+    fn set_viewport_scales_zoom_to_design() {
+        let mut world = World::new();
+        world.set_viewport(DESIGN_VIEWPORT_W, DESIGN_VIEWPORT_H);
+        assert!((world.camera().zoom - 1.0).abs() < 1e-4);
+
+        world.set_viewport(1080.0, 1920.0);
+        let expected = (1080.0 / DESIGN_VIEWPORT_W).max(1920.0 / DESIGN_VIEWPORT_H);
+        assert!((world.camera().zoom - expected).abs() < 1e-3);
+        assert!(world.camera().zoom > 2.0);
+    }
+
+    #[test]
+    fn run_camera_anchors_player_near_bottom() {
+        let mut world = World::new_seeded(42);
+        world.set_viewport(1080.0, 1920.0);
+        land(&mut world);
+        let input = InputSnapshot::default();
+        for _ in 0..30 {
+            world.tick(input, 1.0 / 60.0);
+        }
+        let t = world.transforms.get(world.player_id).unwrap();
+        let c = world.colliders.get(world.player_id).unwrap();
+        let player_cy = t.y + c.h * 0.5;
+        let cam = world.camera();
+        let screen_y = (player_cy - cam.y) * cam.zoom + cam.viewport_h * 0.5;
+        let fraction = screen_y / cam.viewport_h;
+        assert!(
+            fraction > 0.70 && fraction < 0.86,
+            "expected player near bottom of screen, got fraction={fraction}"
+        );
+    }
+
+    #[test]
+    fn gap_death_uses_local_floor_not_streamed_shaft_tip() {
+        // Stream a FallingShaft far ahead so World.ground_y jumps to the deep floor.
+        let mut world = World::new_seeded(42);
+        land(&mut world);
+        for _ in 0..40 {
+            world.append_segment();
+        }
+        let tip_gy = world.ground_y;
+        assert!(
+            tip_gy > GROUND_Y + 500.0,
+            "expected a deep tip altitude after streaming, got {tip_gy}"
+        );
+        let pid = world.player_id;
+        let local = world.local_ground_y_at(
+            world
+                .transforms
+                .get(pid)
+                .map(|t| t.x)
+                .unwrap_or(0.0),
+        );
+        // Drop the player just past the local death line (not the tip floor).
+        if let Some(t) = world.transforms.get_mut(pid) {
+            t.y = local + DEATH_Y_MARGIN + 5.0;
+        }
+        if let Some(p) = world.players.get_mut(pid) {
+            p.grounded = false;
+            p.state = PlayerState::Falling;
+        }
+        world.check_fall_death();
+        assert_eq!(
+            world.players.get(pid).unwrap().state,
+            PlayerState::Dead,
+            "normal gap must kill on local floor, not wait for streamed shaft depth"
+        );
+    }
+
+    #[test]
+    fn falling_hazard_hit_exits_not_death() {
+        let mut world = force_falling_shaft_world();
+        let hz: Vec<_> = world.hazards.iter().map(|(id, _)| id).collect();
+        for id in hz {
+            world.despawn_entity(id);
+        }
+        let shaft = world.segments()[0].shaft.unwrap();
+        let pid = world.player_id;
+        let px = (shaft.pit_x0 + shaft.pit_x1) * 0.5 - PLAYER_W * 0.5;
+        let py = shaft.enter_y + 80.0;
+        if let Some(t) = world.transforms.get_mut(pid) {
+            t.x = px;
+            t.y = py;
+        }
+        world.falling = Some(crate::falling::FallingState::new(
+            shaft.pit_x0,
+            shaft.pit_x1,
+            shaft.floor_y,
+            shaft.enter_y,
+            shaft.exit_x,
+            shaft.exit_y,
+        ));
+        world.run_mode = RunMode::Falling;
+        if let Some(p) = world.players.get_mut(pid) {
+            p.grounded = false;
+            p.state = PlayerState::Falling;
+        }
+        world.spawn_hazard(px, py, 40.0, 40.0, HazardKind::SolidKill, (1.0, 0.2, 0.2));
+        let input = InputSnapshot::default();
+        world.tick(input, 1.0 / 60.0);
+        assert_ne!(
+            world.players.get(pid).unwrap().state,
+            PlayerState::Dead,
+            "falling hazard hit must not game-over"
+        );
+        assert_eq!(world.run_mode(), RunMode::FallingExit);
+        // Finish the exit lerp without requiring a long horizontal stretch after.
+        for _ in 0..30 {
+            world.tick(input, 1.0 / 60.0);
+            if world.run_mode() == RunMode::Run {
+                break;
+            }
+        }
+        assert_eq!(world.run_mode(), RunMode::Run);
+        assert_ne!(world.players.get(pid).unwrap().state, PlayerState::Dead);
     }
 
     #[test]
@@ -2641,7 +3267,14 @@ mod tests {
         }
         assert_eq!(world.run_mode(), RunMode::Run);
         assert_eq!(world.run_state().falling, 0);
-        // Auto-run restored.
+        // Stays on the deep floor — no teleport back up to enter altitude.
+        let py = world.transforms.get(pid).unwrap().y;
+        assert!(
+            (py + PLAYER_H - shaft.floor_y).abs() < 8.0,
+            "expected land on deep floor, y={py} floor={}",
+            shaft.floor_y
+        );
+        // Auto-run restored on that floor.
         let x0 = world.transforms.get(pid).unwrap().x;
         for _ in 0..30 {
             world.tick(input, 1.0 / 60.0);
@@ -2684,7 +3317,7 @@ mod tests {
         use crate::rng::XorShift64;
         let mut rng = XorShift64::from_seed(7);
         for _ in 0..12 {
-            let seg = generate_segment(&mut rng, SegmentIntent::FallingShaft, 100.0);
+            let seg = generate_segment(&mut rng, SegmentIntent::FallingShaft, 100.0, GROUND_Y);
             assert!(crate::validate::validate_segment(&seg).is_ok());
             assert!(seg.shaft.is_some());
         }

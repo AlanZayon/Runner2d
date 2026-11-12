@@ -770,18 +770,22 @@ bool RendererVulkan::begin_frame() {
     if (!device_ || swapchain_ == VK_NULL_HANDLE) {
         return false;
     }
+    // Wait first; only reset the fence after a successful acquire. Resetting before an
+    // OUT_OF_DATE acquire left the fence unsignaled forever → eternal black screen on resume.
     vkWaitForFences(device_, 1, &in_flight_, VK_TRUE, UINT64_MAX);
-    vkResetFences(device_, 1, &in_flight_);
 
     VkResult result = vkAcquireNextImageKHR(
         device_, swapchain_, UINT64_MAX, image_available_, VK_NULL_HANDLE, &image_index_);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        vs_log("swapchain out of date — dropping for recreate");
+        destroy_swapchain();
         return false;
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         vs_log("vkAcquireNextImageKHR failed: %d", static_cast<int>(result));
         return false;
     }
+    vkResetFences(device_, 1, &in_flight_);
 
     frame_draw_calls_ = 0;
     frame_sprites_ = 0;
@@ -971,6 +975,12 @@ bool RendererVulkan::end_frame() {
     if (vkQueueSubmit(queue_, 1, &submit, in_flight_) != VK_SUCCESS) {
         vs_log("vkQueueSubmit failed");
         frame_open_ = false;
+        // Fence was reset but never submitted — recreate signaled so we don't hang.
+        vkDestroyFence(device_, in_flight_, nullptr);
+        in_flight_ = VK_NULL_HANDLE;
+        VkFenceCreateInfo fci{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        fci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        vkCreateFence(device_, &fci, nullptr, &in_flight_);
         return false;
     }
 
@@ -985,7 +995,12 @@ bool RendererVulkan::end_frame() {
     frame_open_ = false;
     last_draw_calls_ = frame_draw_calls_;
     last_sprites_ = frame_sprites_;
-    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR && result != VK_ERROR_OUT_OF_DATE_KHR) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        vs_log("present out of date — dropping swapchain");
+        destroy_swapchain();
+        return false;
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         vs_log("vkQueuePresentKHR failed: %d", static_cast<int>(result));
         return false;
     }
@@ -1194,10 +1209,17 @@ bool RendererVulkan::create_device() {
 
 bool RendererVulkan::create_swapchain(int width, int height) {
     VkSurfaceCapabilitiesKHR caps{};
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &caps);
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_, surface_, &caps) != VK_SUCCESS) {
+        vs_log("vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed");
+        return false;
+    }
 
     uint32_t format_count = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &format_count, nullptr);
+    if (format_count == 0) {
+        vs_log("no surface formats");
+        return false;
+    }
     std::vector<VkSurfaceFormatKHR> formats(format_count);
     vkGetPhysicalDeviceSurfaceFormatsKHR(physical_, surface_, &format_count, formats.data());
     VkSurfaceFormatKHR chosen = formats[0];
@@ -1219,6 +1241,11 @@ bool RendererVulkan::create_swapchain(int width, int height) {
             static_cast<uint32_t>(height),
             caps.minImageExtent.height,
             caps.maxImageExtent.height);
+    }
+    // Android can report 0×0 briefly after INIT_WINDOW — retry next frame.
+    if (swapchain_extent_.width == 0 || swapchain_extent_.height == 0) {
+        vs_log("swapchain extent 0x0 — surface not ready");
+        return false;
     }
 
     uint32_t image_count = caps.minImageCount + 1;

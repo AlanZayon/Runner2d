@@ -48,6 +48,9 @@ public:
 
     /** Monotonic seconds since an arbitrary epoch. */
     virtual double monotonic_seconds() const = 0;
+
+    /** Device tilt for Falling Mode strafe, in [-1, 1]. 0 on platforms without sensors. */
+    virtual float tilt_x() const { return 0.0f; }
 };
 
 Platform* create_platform();

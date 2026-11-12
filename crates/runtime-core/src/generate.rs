@@ -3,7 +3,7 @@
 use crate::collision_cat::CollisionCategory;
 use crate::components::{HazardKind, PowerupKind};
 use crate::config::{
-    FALLING_EXIT_LIP_WIDTH, FALLING_LIP_WIDTH, FALLING_PIT_WIDTH_MAX, FALLING_PIT_WIDTH_MIN,
+    FALLING_LIP_WIDTH, FALLING_PIT_WIDTH_MAX, FALLING_PIT_WIDTH_MIN, FALLING_RUNWAY_WIDTH,
     FALLING_SHAFT_DEPTH_MAX, FALLING_SHAFT_DEPTH_MIN, GROUND_PLATFORM_H, GROUND_Y, LOW_BAR_HEIGHT,
     MAX_DASH_THROUGH_W, MAX_SAFE_GAP, PLAYER_H,
 };
@@ -143,6 +143,7 @@ fn pack(
     hazards: Vec<HazardSpec>,
     coins: Vec<CoinSpec>,
     powerups: Vec<PowerupSpec>,
+    ground_y: f32,
 ) -> SegmentDefinition {
     pack_shaft(
         intent,
@@ -154,6 +155,7 @@ fn pack(
         coins,
         powerups,
         None,
+        ground_y,
     )
 }
 
@@ -167,12 +169,14 @@ fn pack_shaft(
     coins: Vec<CoinSpec>,
     powerups: Vec<PowerupSpec>,
     shaft: Option<ShaftSpec>,
+    ground_y: f32,
 ) -> SegmentDefinition {
     SegmentDefinition {
         intent,
         template_id: family_id,
         world_x0,
         width,
+        ground_y,
         platforms,
         hazards,
         coins,
@@ -182,8 +186,8 @@ fn pack_shaft(
 }
 
 /// Guaranteed flat recovery (explicit fallback only).
-pub fn safe_recovery(world_x0: f32, width: f32) -> SegmentDefinition {
-    let gy = GROUND_Y;
+pub fn safe_recovery(world_x0: f32, width: f32, ground_y: f32) -> SegmentDefinition {
+    let gy = ground_y;
     let w = width.max(160.0);
     let mut coins = Vec::new();
     let n = ((w / 60.0) as usize).clamp(2, 5);
@@ -201,13 +205,12 @@ pub fn safe_recovery(world_x0: f32, width: f32) -> SegmentDefinition {
         vec![plat(world_x0, gy, w, GROUND_PLATFORM_H, ground_tint())],
         vec![],
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_recovery(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_recovery(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let width = rng.gen_range_f32(180.0, 260.0);
-    let gy = GROUND_Y;
     let mut platforms = vec![plat(world_x0, gy, width, GROUND_PLATFORM_H, ground_tint())];
     let mut coins = Vec::new();
     let coin_n = rng.gen_range_u32(2, 4) as usize;
@@ -240,16 +243,15 @@ fn gen_recovery(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         hazards,
         coins,
-        powerups,
-    )
+        powerups
+        , gy)
 }
 
-fn gen_teach_jump(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_teach_jump(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let gap = rng.gen_range_f32(90.0, 115.0).min(MAX_SAFE_GAP - 15.0);
     let left_w = rng.gen_range_f32(85.0, 120.0);
     let right_w = rng.gen_range_f32(100.0, 140.0);
     let width = left_w + gap + right_w;
-    let gy = GROUND_Y;
     let right_x = left_w + gap;
     let mut platforms = vec![
         plat(world_x0, gy, left_w, GROUND_PLATFORM_H, ground_tint()),
@@ -285,13 +287,12 @@ fn gen_teach_jump(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         vec![],
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_teach_dash(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_teach_dash(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let width = rng.gen_range_f32(200.0, 260.0);
-    let gy = GROUND_Y;
     let bw = rng.gen_range_f32(28.0, 40.0).min(MAX_DASH_THROUGH_W);
     let bx = rng.gen_range_f32(70.0, (width - bw - 50.0).max(80.0));
     let platforms = vec![plat(world_x0, gy, width, GROUND_PLATFORM_H, ground_tint())];
@@ -318,13 +319,12 @@ fn gen_teach_dash(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         hazards,
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_teach_roll(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_teach_roll(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let width = rng.gen_range_f32(200.0, 260.0);
-    let gy = GROUND_Y;
     let bar_w = rng.gen_range_f32(60.0, 90.0);
     let bx = rng.gen_range_f32(60.0, (width - bar_w - 40.0).max(70.0));
     let platforms = vec![plat(world_x0, gy, width, GROUND_PLATFORM_H, ground_tint())];
@@ -352,17 +352,16 @@ fn gen_teach_roll(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         hazards,
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_jump_dash(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_jump_dash(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let gap = rng.gen_range_f32(90.0, 110.0).min(MAX_SAFE_GAP - 20.0);
     let left_w = rng.gen_range_f32(85.0, 110.0);
     let mid_w = rng.gen_range_f32(110.0, 150.0);
     let tail_w = rng.gen_range_f32(70.0, 100.0);
     let width = left_w + gap + mid_w + tail_w;
-    let gy = GROUND_Y;
     let mid_x = left_w + gap;
     let rest_x = mid_x + mid_w;
     let bw = rng.gen_range_f32(28.0, 38.0);
@@ -407,16 +406,15 @@ fn gen_jump_dash(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         hazards,
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_jump_roll(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_jump_roll(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let gap = rng.gen_range_f32(90.0, 110.0).min(MAX_SAFE_GAP - 20.0);
     let left_w = rng.gen_range_f32(85.0, 110.0);
     let right_w = rng.gen_range_f32(160.0, 210.0);
     let width = left_w + gap + right_w;
-    let gy = GROUND_Y;
     let mid_x = left_w + gap;
     let bar_w = rng.gen_range_f32(60.0, 85.0);
     // Leave runway after landing before the low bar.
@@ -454,16 +452,15 @@ fn gen_jump_roll(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         hazards,
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_risk_reward(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_risk_reward(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let gap = rng.gen_range_f32(105.0, 125.0).min(MAX_SAFE_GAP - 10.0);
     let left_w = rng.gen_range_f32(80.0, 110.0);
     let right_w = rng.gen_range_f32(100.0, 160.0);
     let width = left_w + gap + right_w;
-    let gy = GROUND_Y;
     let right_x = left_w + gap;
     let platforms = vec![
         plat(world_x0, gy, left_w, GROUND_PLATFORM_H, ground_tint()),
@@ -498,18 +495,17 @@ fn gen_risk_reward(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         hazards,
         coins,
-        powerups,
-    )
+        powerups
+        , gy)
 }
 
-fn gen_ghost_challenge(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_ghost_challenge(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     // Safe high road + low GhostPassable corridor blocked by AlwaysSolid for non-Ghost.
     let left_w = rng.gen_range_f32(90.0, 120.0);
     let mid_w = rng.gen_range_f32(100.0, 140.0);
     let right_w = rng.gen_range_f32(90.0, 130.0);
     let gap = rng.gen_range_f32(70.0, 95.0);
     let width = left_w + gap + mid_w + 40.0 + right_w;
-    let gy = GROUND_Y;
     let mid_x = world_x0 + left_w + gap;
     let right_x = mid_x + mid_w + 40.0;
     let shelf_y = gy - rng.gen_range_f32(70.0, 95.0);
@@ -563,13 +559,12 @@ fn gen_ghost_challenge(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition
         platforms,
         hazards,
         coins,
-        powerups,
-    )
+        powerups
+        , gy)
 }
 
-fn gen_transition(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
+fn gen_transition(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let width = rng.gen_range_f32(200.0, 280.0);
-    let gy = GROUND_Y;
     let platforms = vec![plat(world_x0, gy, width, GROUND_PLATFORM_H, ground_tint())];
     let n = rng.gen_range_u32(3, 6) as usize;
     let mut coins = Vec::new();
@@ -587,33 +582,29 @@ fn gen_transition(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         platforms,
         vec![],
         coins,
-        Vec::new(),
-    )
+        Vec::new()
+        , gy)
 }
 
-fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
-    let gy = GROUND_Y;
+fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32, gy: f32) -> SegmentDefinition {
     let lip = FALLING_LIP_WIDTH;
-    let exit_lip = FALLING_EXIT_LIP_WIDTH;
+    let runway = FALLING_RUNWAY_WIDTH;
     let pit_w = rng.gen_range_f32(FALLING_PIT_WIDTH_MIN, FALLING_PIT_WIDTH_MAX);
     let depth = rng.gen_range_f32(FALLING_SHAFT_DEPTH_MIN, FALLING_SHAFT_DEPTH_MAX);
     let floor_y = gy + depth;
-    let width = lip + pit_w + exit_lip;
+    let width = lip + pit_w + runway;
     let pit_x0 = world_x0 + lip;
     let pit_x1 = pit_x0 + pit_w;
-    let exit_x = pit_x1;
     let wall_tint = (0.2, 0.22, 0.28);
     let floor_tint = (0.3, 0.5, 0.35);
 
     let wall_h = depth + GROUND_PLATFORM_H;
     let platforms = vec![
-        // Entry lip at run height.
+        // Entry lip at current run height.
         plat(world_x0, gy, lip, GROUND_PLATFORM_H, ground_tint()),
-        // Landing pad at bottom of pit.
-        plat(pit_x0, floor_y, pit_w, GROUND_PLATFORM_H, floor_tint),
-        // Exit lip back at run height (player teleports here on FallingExit).
-        plat(exit_x, gy, exit_lip, GROUND_PLATFORM_H, ground_tint()),
-        // Side walls hang into the pit (y below GROUND_Y so they are not "ground spans").
+        // Deep floor + long horizontal runway (new run altitude — no teleport back up).
+        plat(pit_x0, floor_y, pit_w + runway, GROUND_PLATFORM_H, floor_tint),
+        // Side walls for the pit only (not the runway).
         plat(
             pit_x0 - 14.0,
             gy + GROUND_PLATFORM_H,
@@ -625,15 +616,14 @@ fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
     ];
 
     let mut hazards = Vec::new();
-
-    // Mid-air obstacles (dodge with strafe / dash / ghost).
-    let bands = rng.gen_range_u32(2, 4);
+    // Dense mid-air bands across the long drop (strafe / dash / ghost).
+    let bands = rng.gen_range_u32(7, 11);
     for i in 0..bands {
         let t = (i as f32 + 1.0) / (bands as f32 + 1.0);
         let y = gy + depth * t - 40.0;
-        let w = rng.gen_range_f32(28.0, 44.0);
-        let x = pit_x0 + rng.gen_range_f32(20.0, (pit_w - w - 20.0).max(30.0));
-        let ghost = rng.gen_range_u32(0, 3) == 0;
+        let w = rng.gen_range_f32(28.0, 48.0);
+        let x = pit_x0 + rng.gen_range_f32(16.0, (pit_w - w - 16.0).max(24.0));
+        let ghost = rng.gen_range_u32(0, 4) == 0;
         hazards.push(HazardSpec {
             x,
             y,
@@ -654,14 +644,20 @@ fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         });
     }
 
-    // Vertical coin trail through the pit.
     let mut coins = Vec::new();
-    let coin_n = rng.gen_range_u32(5, 8) as usize;
+    let coin_n = rng.gen_range_u32(10, 16) as usize;
     for i in 0..coin_n {
         let t = (i as f32 + 0.5) / coin_n as f32;
         coins.push(CoinSpec {
-            x: pit_x0 + pit_w * 0.5 + rng.gen_range_f32(-30.0, 30.0),
+            x: pit_x0 + pit_w * 0.5 + rng.gen_range_f32(-36.0, 36.0),
             y: gy + depth * t - 20.0,
+        });
+    }
+    // A few coins along the landing runway.
+    for i in 0..4 {
+        coins.push(CoinSpec {
+            x: pit_x1 + 40.0 + i as f32 * 80.0,
+            y: floor_y - 70.0,
         });
     }
 
@@ -675,7 +671,7 @@ fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         powerups.push(PowerupSpec {
             kind: kinds[rng.choose_index(kinds.len())],
             x: pit_x0 + pit_w * 0.5,
-            y: gy + depth * 0.35,
+            y: gy + depth * 0.28,
         });
     }
 
@@ -684,8 +680,8 @@ fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         pit_x1,
         floor_y,
         enter_y: gy,
-        exit_x,
-        exit_y: gy,
+        exit_x: pit_x1 + runway - 40.0,
+        exit_y: floor_y,
     };
 
     pack_shaft(
@@ -698,6 +694,7 @@ fn gen_falling_shaft(rng: &mut XorShift64, world_x0: f32) -> SegmentDefinition {
         coins,
         powerups,
         Some(shaft),
+        floor_y, // next segments continue at the deep floor altitude
     )
 }
 
@@ -706,18 +703,20 @@ pub fn generate_segment(
     rng: &mut XorShift64,
     intent: SegmentIntent,
     world_x0: f32,
+    ground_y: f32,
 ) -> SegmentDefinition {
+    let gy = ground_y;
     match intent {
-        SegmentIntent::Recovery => gen_recovery(rng, world_x0),
-        SegmentIntent::TeachJump => gen_teach_jump(rng, world_x0),
-        SegmentIntent::TeachDash => gen_teach_dash(rng, world_x0),
-        SegmentIntent::TeachRoll => gen_teach_roll(rng, world_x0),
-        SegmentIntent::JumpDash => gen_jump_dash(rng, world_x0),
-        SegmentIntent::JumpRoll => gen_jump_roll(rng, world_x0),
-        SegmentIntent::RiskReward => gen_risk_reward(rng, world_x0),
-        SegmentIntent::Transition => gen_transition(rng, world_x0),
-        SegmentIntent::FallingShaft => gen_falling_shaft(rng, world_x0),
-        SegmentIntent::GhostChallenge => gen_ghost_challenge(rng, world_x0),
+        SegmentIntent::Recovery => gen_recovery(rng, world_x0, gy),
+        SegmentIntent::TeachJump => gen_teach_jump(rng, world_x0, gy),
+        SegmentIntent::TeachDash => gen_teach_dash(rng, world_x0, gy),
+        SegmentIntent::TeachRoll => gen_teach_roll(rng, world_x0, gy),
+        SegmentIntent::JumpDash => gen_jump_dash(rng, world_x0, gy),
+        SegmentIntent::JumpRoll => gen_jump_roll(rng, world_x0, gy),
+        SegmentIntent::RiskReward => gen_risk_reward(rng, world_x0, gy),
+        SegmentIntent::Transition => gen_transition(rng, world_x0, gy),
+        SegmentIntent::FallingShaft => gen_falling_shaft(rng, world_x0, gy),
+        SegmentIntent::GhostChallenge => gen_ghost_challenge(rng, world_x0, gy),
     }
 }
 
@@ -781,7 +780,7 @@ mod tests {
             SegmentIntent::GhostChallenge,
         ] {
             for _ in 0..8 {
-                let seg = generate_segment(&mut rng, intent, 50.0);
+                let seg = generate_segment(&mut rng, intent, 50.0, GROUND_Y);
                 assert!(
                     validate_segment(&seg).is_ok(),
                     "{intent:?} invalid: {:?}",
@@ -795,8 +794,8 @@ mod tests {
     fn same_seed_same_segment_params() {
         let mut a = XorShift64::from_seed(99);
         let mut b = XorShift64::from_seed(99);
-        let sa = generate_segment(&mut a, SegmentIntent::TeachJump, 0.0);
-        let sb = generate_segment(&mut b, SegmentIntent::TeachJump, 0.0);
+        let sa = generate_segment(&mut a, SegmentIntent::TeachJump, 0.0, GROUND_Y);
+        let sb = generate_segment(&mut b, SegmentIntent::TeachJump, 0.0, GROUND_Y);
         assert_eq!(segment_local_fingerprint(&sa), segment_local_fingerprint(&sb));
     }
 }

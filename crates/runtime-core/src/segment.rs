@@ -79,6 +79,8 @@ pub struct SegmentDefinition {
     /// Absolute world X of segment origin.
     pub world_x0: f32,
     pub width: f32,
+    /// Y of the run-floor platforms for this segment (updates after FallingShaft).
+    pub ground_y: f32,
     pub platforms: Vec<PlatformSpec>,
     pub hazards: Vec<HazardSpec>,
     pub coins: Vec<CoinSpec>,
@@ -89,6 +91,16 @@ pub struct SegmentDefinition {
 impl SegmentDefinition {
     pub fn world_x1(&self) -> f32 {
         self.world_x0 + self.width
+    }
+
+    /// Ground altitude where this segment is entered from the previous one.
+    pub fn entry_ground_y(&self) -> f32 {
+        self.shaft.map(|s| s.enter_y).unwrap_or(self.ground_y)
+    }
+
+    /// Ground altitude the next segment should continue from.
+    pub fn exit_ground_y(&self) -> f32 {
+        self.shaft.map(|s| s.exit_y).unwrap_or(self.ground_y)
     }
 }
 

@@ -123,7 +123,7 @@ mod tests {
         let mut segs = Vec::new();
         let mut x = 0.0;
         for _ in 0..n {
-            let s = safe_recovery(x, 200.0);
+            let s = safe_recovery(x, 200.0, crate::config::GROUND_Y);
             x = s.world_x1();
             segs.push(s);
         }

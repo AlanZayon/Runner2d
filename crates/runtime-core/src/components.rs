@@ -153,6 +153,8 @@ impl Sprite {
 pub struct Player {
     pub grounded: bool,
     pub jump_buffer: f32,
+    /// Remaining time after leaving ground where a jump is still accepted.
+    pub coyote_timer: f32,
     pub state: PlayerState,
     pub state_timer: f32,
     pub dash_cooldown: f32,
@@ -170,6 +172,7 @@ impl Default for Player {
         Self {
             grounded: false,
             jump_buffer: 0.0,
+            coyote_timer: 0.0,
             state: PlayerState::Running,
             state_timer: 0.0,
             dash_cooldown: 0.0,
